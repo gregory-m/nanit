@@ -1,7 +1,7 @@
 FROM golang:1.14-stretch AS build
 ADD src/app /go/src/app
 WORKDIR /go/src
-RUN go build -o /go/bin/nanit app/app.go
+RUN go build -o /go/bin/nanit app/*.go
 
 FROM debian:stretch
 RUN apt-get -yqq update && \

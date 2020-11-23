@@ -25,6 +25,12 @@ Open http://127.0.0.1:8080 in Safari
 - I wanted to learn something new on paternity leave (first project in Go!)
 - Nanit iOS application is nice, but I was really disappointed that it cannot properly stream to TV through AirPlay. As anxious parents of our first child we wanted to have it playing in the background on TV when we are in the kitchen, etc. When AirPlaying it from the phone it was really hard to see the little one in portrait mode + the sound was crazy quiet. This helps us around the issue and we don't have to drain our phone batteries.
 
+## How to develop
+
+```bash
+go run src/app/*.go
+```
+
 ## Disclaimer
 
 I made this program solely for learning purposes. Please use it at your own risk and always follow any terms and conditions which might be applied when communicating to Nanit servers.
