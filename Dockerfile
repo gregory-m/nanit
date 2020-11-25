@@ -1,9 +1,9 @@
 FROM golang:1.14-stretch AS build
-ADD src/app /go/src/app
-ADD go.mod /go/src/
-ADD go.sum /go/src/
-WORKDIR /go/src
-RUN go build -o /go/bin/nanit app/*.go
+ADD src /app/src
+ADD go.mod /app/
+ADD go.sum /app/
+WORKDIR /app
+RUN go build -o ./bin/nanit ./src/*.go
 
 FROM debian:stretch
 RUN apt-get -yqq update && \
@@ -11,7 +11,6 @@ RUN apt-get -yqq update && \
     apt-get autoremove -y && \
     apt-get clean -y
 RUN mkdir -p /app/data
-COPY --from=build /go/bin/nanit /app/nanit
-ADD ./src/static /app/static
+COPY --from=build /app/bin/nanit /app/bin/nanit
 WORKDIR /app
-CMD ["/app/nanit"]
+CMD ["/app/bin/nanit"]
