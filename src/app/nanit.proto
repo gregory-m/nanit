@@ -1,10 +1,7 @@
-syntax = "proto3";
+syntax = "proto2";
 package main;
 
 enum RequestType {
-  // Dummy 0 value to make it proto3 complaint
-  UNKNOWN = 0;
-
   GET_STREAMING = 3;
   PUT_STREAMING = 2;
   GET_SETTINGS = 4;
@@ -61,42 +58,42 @@ enum SensorType {
 }
 
 message SensorData {
-  SensorType sensorType = 1;
-  bool isAlert = 4;
-  int32 timestamp = 5;
-  int32 valueMilli = 6;
-  int32 value = 3;
+  required SensorType sensorType = 1;
+  optional bool isAlert = 4;
+  optional int32 timestamp = 5;
+  optional int32 valueMilli = 6;
+  optional int32 value = 3;
 }
 
 message GetSensorData {
-  bool all = 1;
-  bool temperature = 4;
-  bool humidity = 5;
-  bool light = 6;
-  bool night = 7;
+  optional bool all = 1;
+  optional bool temperature = 4;
+  optional bool humidity = 5;
+  optional bool light = 6;
+  optional bool night = 7;
 }
 
 message Control {
-  bool forceConnectToServer = 5;
-  int32 nightLightTimeout = 6;
+  optional bool forceConnectToServer = 5;
+  optional int32 nightLightTimeout = 6;
 
   enum NightLight {
     LIGHT_OFF = 0;
     LIGHT_ON = 1;
   }
 
-  NightLight nightLight = 3;
+  optional NightLight nightLight = 3;
 
   message SensorDataTransfer {
-    bool sound = 1;
-    bool motion = 2;
-    bool temperature = 3;
-    bool humidity = 4;
-    bool light = 5;
-    bool night = 6;
+    optional bool sound = 1;
+    optional bool motion = 2;
+    optional bool temperature = 3;
+    optional bool humidity = 4;
+    optional bool light = 5;
+    optional bool night = 6;
   }
 
-  SensorDataTransfer sensorDataTransfer = 4;
+  optional SensorDataTransfer sensorDataTransfer = 4;
 
   // ...
 }
@@ -114,46 +111,46 @@ enum MountingMode {
 }
 
 message Settings {
-  bool nightVision = 2;
+  optional bool nightVision = 2;
 
   message SensorSettings {
-    SensorType sensorType = 1;
-    bool useLowThreshold = 2;
-    bool useHighThreshold = 3;
-    int32 lowThreshold = 4;
-    int32 highThreshold = 5;
-    int32 sampleIntervalSec = 6;
-    int32 triggerIntervalSec = 7;
-    bool useMilliForThresholds = 8;
+    required SensorType sensorType = 1;
+    optional bool useLowThreshold = 2;
+    optional bool useHighThreshold = 3;
+    optional int32 lowThreshold = 4;
+    optional int32 highThreshold = 5;
+    optional int32 sampleIntervalSec = 6;
+    optional int32 triggerIntervalSec = 7;
+    optional bool useMilliForThresholds = 8;
   }
 
   repeated SensorSettings sensors = 7;
 
   message StreamSettings {
-    StreamIdentifier id = 1;
-    int32 bitrate = 2;
+    required StreamIdentifier id = 1;
+    optional int32 bitrate = 2;
     
-    int32 economyBitrate = 3;
-    int32 economyFps = 4;
-    int32 bestBitrate = 5;
-    int32 bestFps = 6;
+    optional int32 economyBitrate = 3;
+    optional int32 economyFps = 4;
+    optional int32 bestBitrate = 5;
+    optional int32 bestFps = 6;
     
     // abr = 7;
   }
 
   repeated StreamSettings streams = 8;
-  int32 volume = 9;
+  optional int32 volume = 9;
 
   enum AntiFlicker {
     FR50HZ = 0;
     FR60HZ = 1;
   }
 
-  AntiFlicker antiFlicker = 10;
+  optional AntiFlicker antiFlicker = 10;
 
-  bool sleepMode = 11;
-  bool statusLightOn = 12;
-  int32 mountingMode = 15;
+  optional bool sleepMode = 11;
+  optional bool statusLightOn = 12;
+  optional int32 mountingMode = 15;
 
   enum WifiBand {
     ANY = 0;
@@ -161,25 +158,25 @@ message Settings {
     FR5_0GHZ = 2;
   }
 
-  WifiBand wifiBand = 18;
+  optional WifiBand wifiBand = 18;
 
-  bool micMuteOn = 20;
+  optional bool micMuteOn = 20;
 }
 
 message Status {
-  bool upgradeDownloaded = 1;
+  optional bool upgradeDownloaded = 1;
 
   enum ConnectionToServer {
     DISCONNECTED = 0;
     CONNECTED = 1;
   }
 
-  ConnectionToServer connectionToServer = 2;
-  string currentVersion = 3;
-  MountingMode mode = 4;
-  bool isSecurityUpgrade = 5;
-  string downloadedVersion = 6;
-  string hardwareVersion = 7;
+  optional ConnectionToServer connectionToServer = 2;
+  optional string currentVersion = 3;
+  optional MountingMode mode = 4;
+  optional bool isSecurityUpgrade = 5;
+  optional string downloadedVersion = 6;
+  optional string hardwareVersion = 7;
 }
 
 message Playback {
@@ -188,7 +185,7 @@ message Playback {
     STOPPED = 1;
   }
 
-  Status status = 1;
+  required Status status = 1;
 }
 
 message Stream {
@@ -199,13 +196,13 @@ message Stream {
     P2P = 3;
   }
 
-  Type type = 1;
-  string url = 2;
-  int32 bps = 3;
+  required Type type = 1;
+  optional string url = 2;
+  optional int32 bps = 3;
 }
 
 message Streaming {
-  StreamIdentifier id = 1;
+  required StreamIdentifier id = 1;
 
   enum Status {
     STARTED = 0;
@@ -213,37 +210,37 @@ message Streaming {
     PAUSED = 2;
   }
 
-  Status status = 2;
-  string rtmpUrl = 3;
-  int32 attempts = 4;
+  required Status status = 2;
+  required string rtmpUrl = 3;
+  optional int32 attempts = 4;
 }
 
 message GetLogs {
-  string url = 1;
+  required string url = 1;
 }
 
 message Request {
-  int32 id = 1;
-  RequestType type = 2;
+  required int32 id = 1;
+  required RequestType type = 2;
 
-  GetSensorData getSensorData = 12;
+  optional GetSensorData getSensorData = 12;
   repeated SensorData sensorData = 13;
 
-  Streaming streaming = 4;
-  Control control = 15;
-  Settings settings = 5;
-  Status status = 7;
-  Playback playback = 16;
-  GetLogs getLogs = 18;
+  optional Streaming streaming = 4;
+  optional Control control = 15;
+  optional Settings settings = 5;
+  optional Status status = 7;
+  optional Playback playback = 16;
+  optional GetLogs getLogs = 18;
 }
 
 message Response {
-  int32 requestId = 1;
-  RequestType requestType = 2;
-  int32 statusCode = 3;
+  required int32 requestId = 1;
+  required RequestType requestType = 2;
+  required int32 statusCode = 3;
 
   repeated SensorData sensorData = 9;
-  Settings settings = 6;
+  optional Settings settings = 6;
 }
 
 message Message {
@@ -252,7 +249,7 @@ message Message {
     REQUEST = 1;
     RESPONSE = 2;
   }
-  Type type = 1;
-  Request request = 2;
-  Response response = 3;
+  required Type type = 1;
+  optional Request request = 2;
+  optional Response response = 3;
 }

@@ -15,6 +15,10 @@ import (
 var red = color.FgRed.Render
 var green = color.FgGreen.Render
 
+func constRefInt32(i int32) *int32 { return &i }
+func constRefBool(b bool) *bool    { return &b }
+func constRefStr(s string) *string { return &s }
+
 func getMessageBytes(data *Message) []byte {
 	out, err := proto.Marshal(data)
 	if err != nil {
@@ -36,12 +40,9 @@ func sendMessage(socket gowebsocket.Socket, m *Message) {
 func sendKeepAlive(socket gowebsocket.Socket) {
 	if socket.IsConnected {
 		log.Println("Sending keep alive message")
-		sendMessage(socket, &Message{
-			Type: Message_KEEPALIVE,
-		})
-		// socket.SendBinary(getMessageBytes(&Message{
-		// 	Type: Message_KEEPALIVE,
-		// }))
+		socket.SendBinary(getMessageBytes(&Message{
+			Type: Message_Type(Message_KEEPALIVE).Enum(),
+		}))
 	}
 }
 
@@ -64,12 +65,12 @@ func wsConnection(authToken string, cameraUID string) {
 		log.Println("Connected to server")
 
 		sendMessage(socket, &Message{
-			Type: &Message_REQUEST,
+			Type: Message_Type(Message_REQUEST).Enum(),
 			Request: &Request{
-				Id:   1,
-				Type: &RequestType_GET_SENSOR_DATA,
+				Id:   constRefInt32(1),
+				Type: RequestType(RequestType_GET_SENSOR_DATA).Enum(),
 				GetSensorData: &GetSensorData{
-					All: true,
+					All: constRefBool(true),
 				},
 			},
 		})
@@ -105,8 +106,11 @@ func wsConnection(authToken string, cameraUID string) {
 	}
 
 	socket.OnDisconnected = func(err error, socket gowebsocket.Socket) {
-		log.Println("Disconnected from server ")
-		return
+		if err != nil {
+			log.Println(fmt.Errorf("Disconnected from server: %v", err))
+		} else {
+			log.Println("Disconnected from server")
+		}
 	}
 
 	socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
@@ -121,31 +125,31 @@ func wsConnection(authToken string, cameraUID string) {
 		case <-initialKeepAlive.C:
 			if socket.IsConnected {
 				sendMessage(socket, &Message{
-					Type: Message_REQUEST,
+					Type: Message_Type(Message_REQUEST).Enum(),
 					Request: &Request{
-						Id:   2,
-						Type: RequestType_PUT_STREAMING,
+						Id:   constRefInt32(2),
+						Type: RequestType(RequestType_PUT_STREAMING).Enum(),
 						Streaming: &Streaming{
-							Id:       StreamIdentifier_MOBILE,
-							RtmpUrl:  "rtmp://192.168.3.234:1935/nanit/live",
-							Status:   Streaming_STARTED,
-							Attempts: 2,
+							Id:       StreamIdentifier(StreamIdentifier_MOBILE).Enum(),
+							RtmpUrl:  constRefStr("rtmp://192.168.3.234:1935/nanit/live"),
+							Status:   Streaming_Status(Streaming_STARTED).Enum(),
+							Attempts: constRefInt32(3),
 						},
 					},
 				})
 
-				// sendKeepAlive(socket)
+				sendKeepAlive(socket)
 			} else {
 				initialKeepAlive.Reset(1 * time.Second)
 			}
 		case <-getLogTimer.C:
 			sendMessage(socket, &Message{
-				Type: Message_REQUEST,
+				Type: Message_Type(Message_REQUEST).Enum(),
 				Request: &Request{
-					Id:   3,
-					Type: RequestType_GET_LOGS,
+					Id:   constRefInt32(3),
+					Type: RequestType(RequestType_GET_LOGS).Enum(),
 					GetLogs: &GetLogs{
-						Url: "http://192.168.3.234:8080/log",
+						Url: constRefStr("http://192.168.3.234:8080/log"),
 					},
 				},
 			})

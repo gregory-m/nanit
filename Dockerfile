@@ -1,6 +1,8 @@
 FROM golang:1.14-stretch AS build
 ADD src/app /go/src/app
 WORKDIR /go/src
+RUN go get github.com/golang/protobuf/proto
+RUN go get github.com/sacOO7/gowebsocket
 RUN go build -o /go/bin/nanit app/*.go
 
 FROM debian:stretch
