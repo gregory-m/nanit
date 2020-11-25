@@ -2,13 +2,22 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
-func startStream(url string, dataDir string) {
+func startStream(babyUID string, authToken string, dataDirs DataDirectories) func() {
+	ensureValidBabyUID(babyUID)
+
+	outFilename := filepath.Join(dataDirs.VideoDir, fmt.Sprintf("%v.m3u8", babyUID))
+	logFilename := filepath.Join(dataDirs.LogDir, fmt.Sprintf("ffmpeg-%v-%v.log", babyUID, time.Now().Format(time.RFC3339)))
+	url := fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", babyUID, authToken)
+
 	args := []string{
 		"-i",
 		url,
@@ -26,16 +35,31 @@ func startStream(url string, dataDir string) {
 		"10",
 		"-start_number",
 		"1",
-		fmt.Sprintf("%v/stream.m3u8", dataDir),
+		outFilename,
 	}
 
-	log.Println(fmt.Sprintf("Starting FFMPEG with args: %v", strings.Join(args, " ")))
+	logFile, fileErr := os.Create(logFilename)
+	if fileErr != nil {
+		log.Fatal().Str("filename", logFilename).Err(fileErr).Msg("Unable to create log file")
+	}
+
+	defer logFile.Close()
+
+	log.Info().Str("args", strings.Join(args, " ")).Str("logfile", logFilename).Msg("Starting FFMPEG")
 
 	cmd := exec.Command("ffmpeg", args...)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+	cmd.Stderr = logFile
+	cmd.Stdout = logFile
+
 	err := cmd.Start()
 	if err != nil {
-		log.Fatal(fmt.Errorf("Run failed: %v", err))
+		log.Fatal().Err(err).Msg("Unable to start FFMPEG")
+	}
+
+	return func() {
+		log.Info().Msg("Terminating FFMPEG")
+		if err := cmd.Process.Kill(); err != nil {
+			log.Error().Err(err).Msg("Unable to kill process")
+		}
 	}
 }
