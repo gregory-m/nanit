@@ -29,7 +29,7 @@ Open http://127.0.0.1:8080 in Safari
 
 ```bash
 go mod download
-go run src/app/*.go
+go run src/*.go
 ```
 
 ## Disclaimer

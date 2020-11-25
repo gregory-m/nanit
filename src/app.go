@@ -139,11 +139,17 @@ func main() {
 	// Fetches babies info if they are not present in session
 	api.EnsureBabies()
 
-	babiesStreamClosers := make([]func(), len(sessionStore.Session.Babies))
+	babyClosers := make([]func(), len(sessionStore.Session.Babies))
 
 	// Start reading the data from the stream
 	for i, baby := range sessionStore.Session.Babies {
-		babiesStreamClosers[i] = startStream(baby.UID, sessionStore.Session.AuthToken, dataDirectories)
+		closeStream := startStream(baby.UID, sessionStore.Session.AuthToken, dataDirectories)
+		closeWebsocket := wsConnection(sessionStore.Session.AuthToken, baby.CameraUID)
+
+		babyClosers[i] = func() {
+			closeStream()
+			closeWebsocket()
+		}
 	}
 
 	// Start serving content over HTTP
@@ -153,8 +159,8 @@ func main() {
 		select {
 		case <-interrupt:
 			log.Warn().Msg("Received interrupt signal, terminating")
-			for _, closeBabyStream := range babiesStreamClosers {
-				closeBabyStream()
+			for _, closeBaby := range babyClosers {
+				closeBaby()
 			}
 
 			return

@@ -56,10 +56,19 @@ func startStream(babyUID string, authToken string, dataDirs DataDirectories) fun
 		log.Fatal().Err(err).Msg("Unable to start FFMPEG")
 	}
 
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			log.Error().Err(err).Msg("FFMPEG exited")
+		}
+	}()
+
 	return func() {
-		log.Info().Msg("Terminating FFMPEG")
-		if err := cmd.Process.Kill(); err != nil {
-			log.Error().Err(err).Msg("Unable to kill process")
+		if !cmd.ProcessState.Exited() {
+			log.Info().Msg("Terminating FFMPEG")
+			if err := cmd.Process.Kill(); err != nil {
+				log.Error().Err(err).Msg("Unable to kill process")
+			}
 		}
 	}
 }
