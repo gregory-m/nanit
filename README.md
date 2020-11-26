@@ -6,8 +6,8 @@ This is sleepless night induced pet project to restream Nanit Baby Monitor live 
 
 ```bash
 docker run --rm \
-  -e EMAIL=your@email.tld \
-  -e PASSWORD=XXXXXXXXXXXXX \
+  -e NANIT_EMAIL=your@email.tld \
+  -e NANIT_PASSWORD=XXXXXXXXXXXXX \
   -p 8080:8080 \
   registry.gitlab.com/adam.stanek/nanit:latest
 ```
@@ -24,6 +24,10 @@ Open http://127.0.0.1:8080 in Safari
 
 - I wanted to learn something new on paternity leave (first project in Go!)
 - Nanit iOS application is nice, but I was really disappointed that it cannot properly stream to TV through AirPlay. As anxious parents of our first child we wanted to have it playing in the background on TV when we are in the kitchen, etc. When AirPlaying it from the phone it was really hard to see the little one in portrait mode + the sound was crazy quiet. This helps us around the issue and we don't have to drain our phone batteries.
+
+## Usage
+
+Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](https://gitlab.com/adam.stanek/nanit/-/blob/master/.env.sample).
 
 ## How to develop
 
