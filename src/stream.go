@@ -64,11 +64,12 @@ func startStream(babyUID string, authToken string, dataDirs DataDirectories) fun
 	}()
 
 	return func() {
-		if !cmd.ProcessState.Exited() {
-			log.Info().Msg("Terminating FFMPEG")
-			if err := cmd.Process.Kill(); err != nil {
-				log.Error().Err(err).Msg("Unable to kill process")
-			}
+		// FIXME: probably synchronization problem
+		// if !cmd.ProcessState.Exited() {
+		log.Info().Msg("Terminating FFMPEG")
+		if err := cmd.Process.Kill(); err != nil {
+			log.Error().Err(err).Msg("Unable to kill process")
 		}
+		// }
 	}
 }
