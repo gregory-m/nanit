@@ -143,11 +143,12 @@ func main() {
 
 	// Start reading the data from the stream
 	for i, baby := range sessionStore.Session.Babies {
-		closeStream := startStream(baby.UID, sessionStore.Session.AuthToken, dataDirectories)
+		sp := NewStreamProcess(baby.UID, sessionStore.Session, dataDirectories)
 		// closeWebsocket := wsConnection(sessionStore.Session.AuthToken, baby.CameraUID)
 
 		babyClosers[i] = func() {
-			closeStream()
+			log.Info().Str("babyuid", baby.UID).Msg("Closing baby")
+			sp.Stop()
 			// closeWebsocket()
 		}
 	}
