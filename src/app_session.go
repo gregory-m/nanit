@@ -3,16 +3,18 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
-const REVISION = 1
+const REVISION = 2
 
 type AppSession struct {
-	Revision  int    `json:"revision"`
-	AuthToken string `json:"authToken"`
-	Babies    []Baby `json:"babies"`
+	Revision  int       `json:"revision"`
+	AuthToken string    `json:"authToken"`
+	AuthTime  time.Time `json:"authTime"`
+	Babies    []Baby    `json:"babies"`
 }
 
 type AppSessionStore struct {

@@ -85,6 +85,7 @@ func (c *NanitClient) Authorize() {
 
 	log.Info().Str("token", anonymizeToken(authResponse.AccessToken, 4)).Msg("Authorized")
 	c.SessionStore.Session.AuthToken = authResponse.AccessToken
+	c.SessionStore.Session.AuthTime = time.Now()
 	c.SessionStore.Save()
 }
 

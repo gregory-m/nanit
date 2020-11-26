@@ -141,7 +141,7 @@ func main() {
 	dataDirectories := ensureDataDirectories()
 	sessionStore := initSessionStore()
 
-	api := NanitClient{
+	api := &NanitClient{
 		Email:        EnvVarReqStr("NANIT_EMAIL"),
 		Password:     EnvVarReqStr("NANIT_PASSWORD"),
 		SessionStore: sessionStore,
@@ -161,7 +161,7 @@ func main() {
 
 		sp := NewStreamProcess(cmdTemplate, baby.UID, sessionStore.Session, dataDirectories)
 
-		ws := NewWebsocketConnection(baby.CameraUID, sessionStore.Session)
+		ws := NewWebsocketConnection(baby.CameraUID, sessionStore.Session, api)
 		registerWebsocketHandlers(ws)
 		ws.Start()
 

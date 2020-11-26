@@ -13,6 +13,7 @@ import (
 type WebsocketConnection struct {
 	CameraUID string
 	Session   *AppSession
+	API       *NanitClient
 	Socket    gowebsocket.Socket
 	Attempter *Attempter
 
@@ -21,10 +22,11 @@ type WebsocketConnection struct {
 	HandleMessage     func(*Message, *WebsocketConnection)
 }
 
-func NewWebsocketConnection(cameraUID string, session *AppSession) *WebsocketConnection {
+func NewWebsocketConnection(cameraUID string, session *AppSession, api *NanitClient) *WebsocketConnection {
 	return &WebsocketConnection{
 		CameraUID: cameraUID,
 		Session:   session,
+		API:       api,
 	}
 }
 
@@ -96,6 +98,11 @@ func (conn *WebsocketConnection) SendMessage(m *Message) {
 }
 
 func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
+	// Reauthorize if it is not a first try or if the session is older then 10 minutes
+	if attempt.Number > 1 || time.Since(conn.Session.AuthTime) > 10*time.Minute {
+		conn.API.Authorize()
+	}
+
 	// Remote
 	url := fmt.Sprintf("wss://api.nanit.com/focus/cameras/%v/user_connect", conn.CameraUID)
 	auth := fmt.Sprintf("Bearer %v", conn.Session.AuthToken)
