@@ -12,6 +12,7 @@ import (
 )
 
 type StreamProcess struct {
+	CommandTemplate string
 	BabyUID         string
 	InterruptC      chan bool
 	DoneC           chan bool
@@ -19,11 +20,12 @@ type StreamProcess struct {
 	DataDirectories DataDirectories
 }
 
-func NewStreamProcess(babyUID string, session *AppSession, dataDirs DataDirectories) *StreamProcess {
+func NewStreamProcess(cmdTemplate string, babyUID string, session *AppSession, dataDirs DataDirectories) *StreamProcess {
 	// Check babyUID does not contain and bad characters (we use it as part of the file paths)
 	ensureValidBabyUID(babyUID)
 
 	sp := &StreamProcess{
+		CommandTemplate: cmdTemplate,
 		BabyUID:         babyUID,
 		Session:         session,
 		DataDirectories: dataDirs,
@@ -42,29 +44,11 @@ func (sp *StreamProcess) Stop() {
 }
 
 func execStreamProcess(sp *StreamProcess) {
-	outFilename := filepath.Join(sp.DataDirectories.VideoDir, fmt.Sprintf("%v.m3u8", sp.BabyUID))
-	logFilename := filepath.Join(sp.DataDirectories.LogDir, fmt.Sprintf("ffmpeg-%v-%v.log", sp.BabyUID, time.Now().Format(time.RFC3339)))
+	logFilename := filepath.Join(sp.DataDirectories.LogDir, fmt.Sprintf("process-%v-%v.log", sp.BabyUID, time.Now().Format(time.RFC3339)))
 	url := fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", sp.BabyUID, sp.Session.AuthToken)
 
-	args := []string{
-		"-i",
-		url,
-		"-vcodec",
-		"copy",
-		"-acodec",
-		"copy",
-		"-hls_init_time",
-		"0",
-		"-hls_time",
-		"1",
-		"-hls_list_size",
-		"6",
-		"-hls_wrap",
-		"10",
-		"-start_number",
-		"1",
-		outFilename,
-	}
+	r := strings.NewReplacer("{sourceUrl}", url, "{babyUid}", sp.BabyUID)
+	cmdTokens := strings.Split(r.Replace(sp.CommandTemplate), " ")
 
 	logFile, fileErr := os.Create(logFilename)
 	if fileErr != nil {
@@ -73,15 +57,16 @@ func execStreamProcess(sp *StreamProcess) {
 
 	defer logFile.Close()
 
-	log.Info().Str("args", strings.Join(args, " ")).Str("logfile", logFilename).Msg("Starting FFMPEG")
+	log.Info().Str("cmd", strings.Join(cmdTokens, " ")).Str("logfile", logFilename).Msg("Starting stream processor")
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(cmdTokens[0], cmdTokens[1:]...)
 	cmd.Stderr = logFile
 	cmd.Stdout = logFile
+	cmd.Dir = sp.DataDirectories.VideoDir
 
 	err := cmd.Start()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Unable to start FFMPEG")
+		log.Fatal().Err(err).Msg("Unable to start stream processor")
 	}
 
 	done := make(chan error, 1)
@@ -98,13 +83,15 @@ func execStreamProcess(sp *StreamProcess) {
 		select {
 		case err := <-done:
 			if err != nil {
-				log.Error().Err(err).Msg("FFMPEG exited")
+				log.Error().Err(err).Msg("Stream processor exited")
+			} else {
+				log.Warn().Msg("Stream processor exited with status 0")
 			}
 
 			return
 
 		case <-sp.InterruptC:
-			log.Info().Msg("Terminating FFMPEG")
+			log.Info().Msg("Terminating stream processor")
 			if err := cmd.Process.Kill(); err != nil {
 				log.Error().Err(err).Msg("Unable to kill process")
 			}

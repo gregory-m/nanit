@@ -143,7 +143,12 @@ func main() {
 
 	// Start reading the data from the stream
 	for i, baby := range sessionStore.Session.Babies {
-		sp := NewStreamProcess(baby.UID, sessionStore.Session, dataDirectories)
+		cmdTemplate := EnvVarStr(
+			"NANIT_RMT_STREAM_CMD",
+			"ffmpeg -i {sourceUrl} -codec copy -hls_time 1 -hls_wrap 10 -hls_flags delete_segments -hls_segment_filename {babyUid}-%02d.ts {babyUid}.m3u8",
+		)
+
+		sp := NewStreamProcess(cmdTemplate, baby.UID, sessionStore.Session, dataDirectories)
 		// closeWebsocket := wsConnection(sessionStore.Session.AuthToken, baby.CameraUID)
 
 		babyClosers[i] = func() {
