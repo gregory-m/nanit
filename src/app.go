@@ -160,12 +160,15 @@ func main() {
 		)
 
 		sp := NewStreamProcess(cmdTemplate, baby.UID, sessionStore.Session, dataDirectories)
-		// closeWebsocket := wsConnection(sessionStore.Session.AuthToken, baby.CameraUID)
+
+		ws := NewWebsocketConnection(baby.CameraUID, sessionStore.Session)
+		registerWebsocketHandlers(ws)
+		ws.Start()
 
 		babyClosers[i] = func() {
 			log.Info().Str("babyuid", baby.UID).Msg("Closing baby")
 			sp.Stop()
-			// closeWebsocket()
+			ws.Stop()
 		}
 	}
 
