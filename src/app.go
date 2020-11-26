@@ -12,6 +12,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Injected on CI (from CI_COMMIT_SHORT_SHA)
+var GitCommit string
+
 func loadDotEnvFile() {
 	absFilepath, filePathErr := filepath.Abs(".env")
 	if filePathErr != nil {
@@ -125,6 +128,14 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt)
 
 	initLogger()
+
+	initMsg := log.Info()
+	if GitCommit != "" {
+		initMsg.Str("gitversion", GitCommit)
+	}
+
+	initMsg.Msg("Application started")
+
 	loadDotEnvFile()
 	setLogLevel()
 	dataDirectories := ensureDataDirectories()

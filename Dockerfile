@@ -3,7 +3,8 @@ ADD src /app/src
 ADD go.mod /app/
 ADD go.sum /app/
 WORKDIR /app
-RUN go build -o ./bin/nanit ./src/*.go
+ARG CI_COMMIT_SHORT_SHA
+RUN go build -ldflags "-X main.GitCommit=$CI_COMMIT_SHORT_SHA" -o ./bin/nanit ./src/*.go
 
 FROM debian:stretch
 RUN apt-get -yqq update && \
