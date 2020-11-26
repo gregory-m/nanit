@@ -1,2 +1,4 @@
 *
 !./src
+!./go.mod
+!./go.sum
