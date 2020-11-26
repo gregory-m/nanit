@@ -36,6 +36,10 @@ func serve(babies []Baby, dataDir DataDirectories) {
 		defer r.Body.Close()
 
 		out, err := os.Create(filename)
+		if err != nil {
+			log.Error().Str("file", filename).Err(err).Msg("Unable to create file")
+		}
+
 		defer out.Close()
 
 		_, err = io.Copy(out, r.Body)
