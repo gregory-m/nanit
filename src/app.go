@@ -102,7 +102,7 @@ func ensureValidBabyUID(babyUID string) {
 }
 
 func initSessionStore() *AppSessionStore {
-	sessionStore := new(AppSessionStore)
+	sessionStore := NewAppSessionStore()
 
 	// Load previous state of the application from session file
 	sessionFile := EnvVarStr("NANIT_SESSION_FILE", "")

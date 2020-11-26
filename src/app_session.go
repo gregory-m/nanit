@@ -20,10 +20,15 @@ type AppSessionStore struct {
 	Session  *AppSession
 }
 
+func NewAppSessionStore() *AppSessionStore {
+	return &AppSessionStore{
+		Session: &AppSession{Revision: REVISION},
+	}
+}
+
 func (store *AppSessionStore) Load() {
 	if _, err := os.Stat(store.Filename); os.IsNotExist(err) {
 		log.Info().Str("filename", store.Filename).Msg("No app session file found")
-		store.Session = &AppSession{Revision: REVISION}
 		return
 	}
 
@@ -44,7 +49,6 @@ func (store *AppSessionStore) Load() {
 		store.Session = session
 		log.Info().Str("filename", store.Filename).Msg("Loaded app session from the file")
 	} else {
-		store.Session = &AppSession{Revision: REVISION}
 		log.Warn().Str("filename", store.Filename).Msg("App session file contains older revision of the state, ignoring")
 	}
 
