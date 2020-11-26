@@ -9,7 +9,7 @@ docker run --rm \
   -e NANIT_EMAIL=your@email.tld \
   -e NANIT_PASSWORD=XXXXXXXXXXXXX \
   -p 8080:8080 \
-  registry.gitlab.com/adam.stanek/nanit:latest
+  registry.gitlab.com/adam.stanek/nanit:v0-2
 ```
 
 Open http://127.0.0.1:8080 in Safari
@@ -27,7 +27,7 @@ Open http://127.0.0.1:8080 in Safari
 
 ## Usage
 
-Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](https://gitlab.com/adam.stanek/nanit/-/blob/master/.env.sample).
+Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](.env.sample).
 
 ## How to develop
 
