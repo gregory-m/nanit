@@ -36,7 +36,7 @@ services:
     - '1935:1935'
 ```
 
-Open `rtmp://127.0.0.1:1935` in VLC
+Open `rtmp://127.0.0.1:1935/live` in VLC
 
 **Notice:** The cam does not seem to react well if it tries to start streaming at the time when RTMP server is not ready. It is adviced to ensure nging-rtmp is started first. If the streaming does not start in few seconds, try to restart the nanit container to reinitiate the streaming.
 
