@@ -4,6 +4,8 @@ This is sleepless night induced pet project to restream Nanit Baby Monitor live 
 
 ## TL;DR
 
+### a) Restream live feed as HLS
+
 ```bash
 docker run --rm \
   -e NANIT_EMAIL=your@email.tld \
@@ -14,20 +16,41 @@ docker run --rm \
 
 Open http://127.0.0.1:8080 in Safari
 
-## Features
+### b) Restream to local RTMP server
 
-- Authenticates to Nanit servers
-- Retrieves RTMP stream
-- Exposes the stream as HLS so that it can be directly AirPlayed to the TV
+```bash
+docker run --rm \
+  -e NANIT_EMAIL=your@email.tld \
+  -e NANIT_PASSWORD=XXXXXXXXXXXXX \
+  -e NANIT_REMOTE_STREAM_ENABLED=false \
+  -e NANIT_HTTP_ENABLED=false \
+  -e NANIT_LOCAL_STREAM_ENABLED=true \
+  -e NANIT_LOCAL_STREAM_PUSH_TARGET=rtmp://192.168.3.234:1935/live
+  registry.gitlab.com/adam.stanek/nanit:v0-2
+```
+
+Open `rtmp://127.0.0.1:1935` in VLC
+
+### Further usage
+
+Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](.env.sample).
+
+
+### HLS vs Local RTMP
+
+- (+) HLS is viewable from Safari browser, from there you can directly AirPlay the video to your TV
+- (-) HLS is not designed to by low-latency. The stream is split into chunks of certain size which are then downloaded by clients. Because of that you are always behind at least by the size of a chunk + network delay.
+- (-) HLS is not easily consumable by Home Assistant / Homebridge part
+
+- (+) You use the stream by served RTMP server to not care about any authentication on Home Assistant / Homebridge part
+- (-) RTMP is not openable in any web browser
+- (-) You need additional RTMP server to relay the content to clients
+- **(-) We cannot handle any dropouts. Cam is communicating directly with that server. There is no way of knowing if the streaming stopped for some reason.**
 
 ## Why?
 
 - I wanted to learn something new on paternity leave (first project in Go!)
 - Nanit iOS application is nice, but I was really disappointed that it cannot properly stream to TV through AirPlay. As anxious parents of our first child we wanted to have it playing in the background on TV when we are in the kitchen, etc. When AirPlaying it from the phone it was really hard to see the little one in portrait mode + the sound was crazy quiet. This helps us around the issue and we don't have to drain our phone batteries.
-
-## Usage
-
-Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](.env.sample).
 
 ## How to develop
 
@@ -35,6 +58,8 @@ Application is ready to be used in Docker. You can use environment variables for
 go mod download
 go run src/*.go
 ```
+
+For some insights see [Developer notes](docs/developer-notes.md).
 
 ## Disclaimer
 

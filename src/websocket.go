@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	sync "sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -11,11 +12,12 @@ import (
 )
 
 type WebsocketConnection struct {
-	CameraUID string
-	Session   *AppSession
-	API       *NanitClient
-	Socket    gowebsocket.Socket
-	Attempter *Attempter
+	CameraUID     string
+	Session       *AppSession
+	API           *NanitClient
+	Socket        gowebsocket.Socket
+	Attempter     *Attempter
+	LastRequestID int32
 
 	HandleReady       func(*WebsocketConnection)
 	HandleTermination func()
@@ -24,9 +26,10 @@ type WebsocketConnection struct {
 
 func NewWebsocketConnection(cameraUID string, session *AppSession, api *NanitClient) *WebsocketConnection {
 	return &WebsocketConnection{
-		CameraUID: cameraUID,
-		Session:   session,
-		API:       api,
+		CameraUID:     cameraUID,
+		Session:       session,
+		API:           api,
+		LastRequestID: 0,
 	}
 }
 
@@ -95,6 +98,20 @@ func (conn *WebsocketConnection) SendMessage(m *Message) {
 	log.Trace().Bytes("rawdata", bytes).Msg("Sending data")
 
 	conn.Socket.SendBinary(bytes)
+}
+
+func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Request) {
+	id := atomic.AddInt32(&conn.LastRequestID, 1)
+
+	requestData.Id = constRefInt32(id)
+	requestData.Type = RequestType(reqType).Enum()
+
+	m := &Message{
+		Type:    Message_Type(Message_REQUEST).Enum(),
+		Request: &requestData,
+	}
+
+	conn.SendMessage(m)
 }
 
 func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {

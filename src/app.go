@@ -154,26 +154,47 @@ func main() {
 
 	// Start reading the data from the stream
 	for i, baby := range sessionStore.Session.Babies {
-		cmdTemplate := EnvVarStr(
-			"NANIT_RMT_STREAM_CMD",
-			"ffmpeg -i {sourceUrl} -codec copy -hls_time 1 -hls_wrap 10 -hls_flags delete_segments -hls_segment_filename {babyUid}-%02d.ts {babyUid}.m3u8",
-		)
-
-		sp := NewStreamProcess(cmdTemplate, baby.UID, sessionStore.Session, dataDirectories)
-
-		ws := NewWebsocketConnection(baby.CameraUID, sessionStore.Session, api)
-		registerWebsocketHandlers(ws)
-		ws.Start()
-
 		babyClosers[i] = func() {
 			log.Info().Str("babyuid", baby.UID).Msg("Closing baby")
-			sp.Stop()
-			ws.Stop()
+		}
+
+		// Remote stream processing
+		if EnvVarBool("NANIT_REMOTE_STREAM_ENABLED", true) {
+			cmdTemplate := EnvVarStr(
+				"NANIT_REMOTE_STREAM_CMD",
+				"ffmpeg -i {sourceUrl} -codec copy -hls_time 1 -hls_wrap 10 -hls_flags delete_segments -hls_segment_filename {babyUid}-%02d.ts {babyUid}.m3u8",
+			)
+
+			sp := NewStreamProcess(cmdTemplate, baby.UID, sessionStore.Session, dataDirectories)
+			prev := babyClosers[i]
+			babyClosers[i] = func() {
+				prev()
+				sp.Stop()
+			}
+		}
+
+		// Local stream
+		localStreamURL := ""
+		if EnvVarBool("NANIT_LOCAL_STREAM_ENABLED", false) {
+			localStreamURL = EnvVarReqStr("NANIT_LOCAL_STREAM_PUSH_TARGET")
+
+			// Websocket connection
+			ws := NewWebsocketConnection(baby.CameraUID, sessionStore.Session, api)
+			registerWebsocketHandlers(ws, localStreamURL)
+			ws.Start()
+
+			prev := babyClosers[i]
+			babyClosers[i] = func() {
+				prev()
+				ws.Stop()
+			}
 		}
 	}
 
 	// Start serving content over HTTP
-	go serve(sessionStore.Session.Babies, dataDirectories)
+	if EnvVarBool("NANIT_HTTP_ENABLED", true) {
+		go serve(sessionStore.Session.Babies, dataDirectories)
+	}
 
 	for {
 		select {

@@ -25,3 +25,17 @@ func EnvVarReqStr(varName string) string {
 
 	return value
 }
+
+func EnvVarBool(varName string, defaultValue bool) bool {
+	value := EnvVarStr(varName, "")
+	if value == "true" {
+		return true
+	} else if value == "false" {
+		return false
+	} else if value == "" {
+		return defaultValue
+	}
+
+	log.Fatal().Msgf("Unexpected value for boolean environment variable %v (allowed values true, false)", varName)
+	return false
+}
