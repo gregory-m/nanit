@@ -11,7 +11,7 @@ docker run --rm \
   -e NANIT_EMAIL=your@email.tld \
   -e NANIT_PASSWORD=XXXXXXXXXXXXX \
   -p 8080:8080 \
-  registry.gitlab.com/adam.stanek/nanit:v0-2
+  registry.gitlab.com/adam.stanek/nanit:v0-3
 ```
 
 Open http://127.0.0.1:8080 in Safari
@@ -22,7 +22,7 @@ Open http://127.0.0.1:8080 in Safari
 version: '2.1'
 services:
   nanit:
-    image: registry.gitlab.com/adam.stanek/nanit:v0-2
+    image: registry.gitlab.com/adam.stanek/nanit:v0-3
     environment:
     - NANIT_EMAIL=your@email.tld
     - NANIT_PASSWORD=XXXXXXXXXXXXX
