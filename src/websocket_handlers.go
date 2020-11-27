@@ -19,6 +19,8 @@ func registerWebsocketHandlers(conn *WebsocketConnection, localStreamServer stri
 
 		// Push streaming URL
 		if localStreamServer != "" {
+			log.Info().Str("target", localStreamServer).Msg("Requesting local streaming")
+
 			conn.SendRequest(RequestType_PUT_STREAMING, Request{
 				Streaming: &Streaming{
 					Id:       StreamIdentifier(StreamIdentifier_MOBILE).Enum(),

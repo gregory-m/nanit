@@ -38,6 +38,8 @@ services:
 
 Open `rtmp://127.0.0.1:1935` in VLC
 
+**Notice:** The cam does not seem to react well if it tries to start streaming at the time when RTMP server is not ready. It is adviced to ensure nging-rtmp is started first. If the streaming does not start in few seconds, try to restart the nanit container to reinitiate the streaming.
+
 ### Further usage
 
 Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](.env.sample).
@@ -53,11 +55,11 @@ Application is ready to be used in Docker. You can use environment variables for
 
 **RTMP:**
 
-- (+) You use the stream by served RTMP server to not care about any authentication on Home Assistant / Homebridge part
+- (+) You can reuse the stream served RTMP server to not care about any authentication on Home Assistant / Homebridge part
 - (+) It is streamed directly from the cam, does not go through Nanit servers
-- (-) RTMP is not openable in any web browser
 - (-) You need additional RTMP server to relay the content to clients
-- **(-) We cannot handle any dropouts. Cam is communicating directly with that server. There is no way of knowing if the streaming stopped for some reason.**
+- (-) RTMP is not openable in any web browser
+- **(-) We cannot handle any dropouts. Cam is communicating directly with that server. There is no way of knowing if the streaming stopped for some reason. Or if it was even initiated properly.**
 
 ## Why?
 
