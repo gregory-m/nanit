@@ -18,15 +18,22 @@ Open http://127.0.0.1:8080 in Safari
 
 ### b) Restream to local RTMP server
 
-```bash
-docker run --rm \
-  -e NANIT_EMAIL=your@email.tld \
-  -e NANIT_PASSWORD=XXXXXXXXXXXXX \
-  -e NANIT_REMOTE_STREAM_ENABLED=false \
-  -e NANIT_HTTP_ENABLED=false \
-  -e NANIT_LOCAL_STREAM_ENABLED=true \
-  -e NANIT_LOCAL_STREAM_PUSH_TARGET=rtmp://192.168.3.234:1935/live
-  registry.gitlab.com/adam.stanek/nanit:v0-2
+```yaml
+version: '2.1'
+services:
+  nanit:
+    image: registry.gitlab.com/adam.stanek/nanit:v0-2
+    environment:
+    - NANIT_EMAIL=your@email.tld
+    - NANIT_PASSWORD=XXXXXXXXXXXXX
+    - NANIT_REMOTE_STREAM_ENABLED=false
+    - NANIT_HTTP_ENABLED=false
+    - NANIT_LOCAL_STREAM_ENABLED=true
+    - NANIT_LOCAL_STREAM_PUSH_TARGET=rtmp://{your_ip}:1935/live
+  nginx:
+    image: tiangolo/nginx-rtmp
+    ports:
+    - '1935:1935'
 ```
 
 Open `rtmp://127.0.0.1:1935` in VLC
@@ -38,11 +45,16 @@ Application is ready to be used in Docker. You can use environment variables for
 
 ### HLS vs Local RTMP
 
+**HLS:**
+
 - (+) HLS is viewable from Safari browser, from there you can directly AirPlay the video to your TV
 - (-) HLS is not designed to by low-latency. The stream is split into chunks of certain size which are then downloaded by clients. Because of that you are always behind at least by the size of a chunk + network delay.
 - (-) HLS is not easily consumable by Home Assistant / Homebridge part
 
+**RTMP:**
+
 - (+) You use the stream by served RTMP server to not care about any authentication on Home Assistant / Homebridge part
+- (+) It is streamed directly from the cam, does not go through Nanit servers
 - (-) RTMP is not openable in any web browser
 - (-) You need additional RTMP server to relay the content to clients
 - **(-) We cannot handle any dropouts. Cam is communicating directly with that server. There is no way of knowing if the streaming stopped for some reason.**
