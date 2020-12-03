@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,13 +15,13 @@ import (
 type StreamProcess struct {
 	CommandTemplate string
 	BabyUID         string
-	InterruptC      chan bool
-	DoneC           chan bool
+	Attempter       *Attempter
+	API             *NanitClient
 	Session         *AppSession
 	DataDirectories DataDirectories
 }
 
-func NewStreamProcess(cmdTemplate string, babyUID string, session *AppSession, dataDirs DataDirectories) *StreamProcess {
+func NewStreamProcess(cmdTemplate string, babyUID string, session *AppSession, api *NanitClient, dataDirs DataDirectories) *StreamProcess {
 	// Check babyUID does not contain and bad characters (we use it as part of the file paths)
 	ensureValidBabyUID(babyUID)
 
@@ -29,21 +30,40 @@ func NewStreamProcess(cmdTemplate string, babyUID string, session *AppSession, d
 		BabyUID:         babyUID,
 		Session:         session,
 		DataDirectories: dataDirs,
-		InterruptC:      make(chan bool, 1),
-		DoneC:           make(chan bool, 1),
+		API:             api,
 	}
-
-	go execStreamProcess(sp)
 
 	return sp
 }
 
-func (sp *StreamProcess) Stop() {
-	sp.InterruptC <- true
-	<-sp.DoneC
+func (sp *StreamProcess) Start() {
+	sp.Attempter = NewAttempter(
+		func(attempt *Attempt) error {
+			return execStreamProcess(sp, attempt)
+		},
+		[]time.Duration{
+			2 * time.Second,
+			30 * time.Second,
+			2 * time.Minute,
+			15 * time.Minute,
+			1 * time.Hour,
+		},
+		2*time.Second,
+	)
+
+	go sp.Attempter.Run()
 }
 
-func execStreamProcess(sp *StreamProcess) {
+func (sp *StreamProcess) Stop() {
+	sp.Attempter.Stop()
+}
+
+func execStreamProcess(sp *StreamProcess, attempt *Attempt) error {
+	// Reauthorize if it is not a first try or if the session is older then 10 minutes
+	if attempt.Number > 1 || time.Since(sp.Session.AuthTime) > 10*time.Minute {
+		sp.API.Authorize()
+	}
+
 	logFilename := filepath.Join(sp.DataDirectories.LogDir, fmt.Sprintf("process-%v-%v.log", sp.BabyUID, time.Now().Format(time.RFC3339)))
 	url := fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", sp.BabyUID, sp.Session.AuthToken)
 
@@ -75,28 +95,24 @@ func execStreamProcess(sp *StreamProcess) {
 		done <- cmd.Wait()
 	}()
 
-	defer func() {
-		sp.DoneC <- true
-	}()
-
 	for {
 		select {
 		case err := <-done:
 			if err != nil {
 				log.Error().Err(err).Msg("Stream processor exited")
-			} else {
-				log.Warn().Msg("Stream processor exited with status 0")
+				return err
 			}
 
-			return
+			log.Warn().Msg("Stream processor exited with status 0")
+			return errors.New("Stream processor exited with status 0")
 
-		case <-sp.InterruptC:
+		case <-attempt.InterruptC:
 			log.Info().Msg("Terminating stream processor")
 			if err := cmd.Process.Kill(); err != nil {
 				log.Error().Err(err).Msg("Unable to kill process")
 			}
 
-			return
+			return nil
 		}
 	}
 }
