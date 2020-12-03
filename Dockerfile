@@ -1,4 +1,4 @@
-FROM golang:1.14-stretch AS build
+FROM golang:1.15.5-buster
 ADD src /app/src
 ADD go.mod /app/
 ADD go.sum /app/
