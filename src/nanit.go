@@ -72,7 +72,9 @@ func (c *NanitClient) Authorize() {
 
 	defer r.Body.Close()
 
-	if r.StatusCode != 201 {
+	if r.StatusCode == 401 {
+		log.Fatal().Msg("Server responded with code 401. Provided credentials has not been accepted by the server. Please check if your e-mail address and password is entered correctly and that 2FA is disabled on your account.")
+	} else if r.StatusCode != 201 {
 		log.Fatal().Int("code", r.StatusCode).Msg("Server responded with unexpected status code")
 	}
 
