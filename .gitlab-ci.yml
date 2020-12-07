@@ -1,35 +1,62 @@
 stages:
-  - build
+  - base image
+  - app image
   - release
 
+# Variables for all the jobs
 variables:
-  CONTAINER_DEV_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
-  CONTAINER_RELEASE_IMAGE: $CI_REGISTRY_IMAGE:latest
+  APP_IMAGE_WITHOUT_TAG: $CI_REGISTRY_IMAGE
+  BASE_IMAGE_WITHOUT_TAG: $CI_REGISTRY_IMAGE/base
   DOCKER_HOST: tcp://docker:2375/
   DOCKER_DRIVER: overlay2
   # See https://github.com/docker-library/docker/pull/166
   DOCKER_TLS_CERTDIR: ""
 
+# Use DinD for all the jobs
 image: registry.gitlab.com/ericvh/docker-buildx-qemu
 services:
   - name: docker:dind
     entrypoint: ["env", "-u", "DOCKER_HOST"]
     command: ["dockerd-entrypoint.sh"]
     
+# Prepare env. for all docker jobs
 before_script:
   - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  - update-binfmts --enable
+  - docker buildx create --driver docker-container --use
 
-build:
-  stage: build
+# Building base image when necessary
+build base image:
+  stage: base image
+  only:
+    changes:
+    - Dockerfile.base
   script:
-    - update-binfmts --enable
-    - docker buildx create --driver docker-container --use
-    - docker buildx build --no-cache --pull --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 -t $CONTAINER_DEV_IMAGE --build-arg CI_COMMIT_SHORT_SHA .
+  - docker buildx build --no-cache --pull --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 -t $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG -f Dockerfile.base .
 
-release:
+# Building app image
+build app image:
+  stage: app image
+  script:
+  - docker buildx imagetools inspect $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG > /dev/null; if [ $? -eq 0 ]; then export BASE_IMAGE_TAG=$CI_COMMIT_REF_SLUG; else export BASE_IMAGE_TAG=latest; fi
+  - "echo \"Using base image: $BASE_IMAGE_WITHOUT_TAG:$BASE_IMAGE_TAG\""
+  - docker buildx build --no-cache --pull --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 -t $APP_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG --build-arg CI_COMMIT_SHORT_SHA --build-arg BASE_IMAGE_TAG .
+
+# Tag base image on master as latest
+release base image:
+  stage: release
+  only:
+    changes:
+    - Dockerfile.base
+    refs:
+    - master
+  script:
+  - docker buildx imagetools create -t $BASE_IMAGE_WITHOUT_TAG:latest $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG 
+
+# Tag app image on master as latest
+release app image:
   stage: release
   only:
   - master
   script:
-    - docker buildx imagetools create -t $CONTAINER_RELEASE_IMAGE $CONTAINER_DEV_IMAGE 
-
+  - docker buildx imagetools create -t $APP_IMAGE_WITHOUT_TAG:latest $APP_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG 
