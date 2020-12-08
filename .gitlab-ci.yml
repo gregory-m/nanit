@@ -38,7 +38,8 @@ build base image:
 build app image:
   stage: app image
   script:
-  - docker buildx imagetools inspect $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG > /dev/null; if [ $? -eq 0 ]; then export BASE_IMAGE_TAG=$CI_COMMIT_REF_SLUG; else export BASE_IMAGE_TAG=latest; fi
+  - export BASE_IMAGE_TAG=$CI_COMMIT_REF_SLUG
+  - docker buildx imagetools inspect $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG > /dev/null || export BASE_IMAGE_TAG=latest
   - "echo \"Using base image: $BASE_IMAGE_WITHOUT_TAG:$BASE_IMAGE_TAG\""
   - docker buildx build --no-cache --pull --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 -t $APP_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG --build-arg CI_COMMIT_SHORT_SHA --build-arg BASE_IMAGE_TAG .
 
