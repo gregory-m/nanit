@@ -31,6 +31,8 @@ build base image:
   only:
     changes:
     - Dockerfile.base
+  except:
+  - tags
   script:
   - docker buildx build --no-cache --pull --push --platform linux/arm/v7,linux/arm64/v8,linux/amd64 -t $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG -f Dockerfile.base .
 
