@@ -59,11 +59,11 @@ func failAttempt(attempter *Attempter, attempt *Attempt, err error) {
 	now := time.Now()
 	timeAgo := now.Sub(attempt.ScheduledAt)
 
-	log.Debug().Int("attempt", attempt.Number).Err(err).Msg("Attempt failed")
+	log.Trace().Int("attempt", attempt.Number).Err(err).Msg("Attempt failed")
 
 	var nextTryNumber int
 	if attempter.ResetThreshold > 0 && timeAgo > attempter.ResetThreshold {
-		log.Debug().Msgf("Previous attempt was %v ago, resetting tries", timeAgo)
+		log.Trace().Msgf("Previous attempt was %v ago, resetting tries", timeAgo)
 
 		nextTryNumber = 1
 	} else {
@@ -94,7 +94,7 @@ func (attempter *Attempter) Run() {
 			return
 
 		case <-timer.C:
-			log.Debug().Msg("Starting attempt")
+			log.Trace().Msg("Starting attempt")
 			attempter.CurrentAttempt = attempt
 			err := attempter.Handler(attempt)
 			attempter.CurrentAttempt = nil
@@ -109,7 +109,7 @@ func (attempter *Attempter) Run() {
 					done()
 					return
 				default:
-					log.Debug().Msg("Attempt handler finished")
+					log.Trace().Msg("Attempt handler finished")
 					return
 				}
 			}

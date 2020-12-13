@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sacOO7/gowebsocket"
 	"google.golang.org/protobuf/proto"
@@ -92,7 +93,15 @@ func (conn *WebsocketConnection) OnMessage(handler func(*Message, *WebsocketConn
 }
 
 func (conn *WebsocketConnection) SendMessage(m *Message) {
-	log.Debug().Stringer("data", m).Msg("Sending message")
+	var msg *zerolog.Event
+
+	if *m.Type == Message_KEEPALIVE {
+		msg = log.Trace()
+	} else {
+		msg = log.Debug()
+	}
+
+	msg.Stringer("data", m).Msg("Sending message")
 
 	bytes := getMessageBytes(m)
 	log.Trace().Bytes("rawdata", bytes).Msg("Sending data")
@@ -146,7 +155,7 @@ func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
 
 	// Handle failed attempts for connection
 	conn.Socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
-		log.Error().Err(err).Msg("Unable to establish websocket connection")
+		log.Error().Str("url", url).Err(err).Msg("Unable to establish websocket connection")
 		once.Do(func() { terminationC <- err })
 		close(terminationC)
 	}
@@ -179,7 +188,7 @@ func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
 		}
 	}
 
-	log.Info().Str("url", url).Msg("Connecting to websocket")
+	log.Trace().Msg("Connecting to websocket")
 	conn.Socket.Connect()
 
 	for {
