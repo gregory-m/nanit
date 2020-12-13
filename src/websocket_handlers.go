@@ -88,23 +88,25 @@ func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localS
 		// })
 	})
 
-	// Listen for termination
-	termC := make(chan bool, 1)
+	// Keep-alive
+	var ticker *time.Ticker
+
 	conn.OnTermination(func() {
-		// Closing the channel will broadcast to all the listeners, regardless to their number
-		close(termC)
+		if ticker != nil {
+			ticker.Stop()
+		}
 	})
 
-	// Keep-alive
 	conn.OnReady(func(conn *WebsocketConnection) {
+		if ticker == nil {
+			ticker = time.NewTicker(20 * time.Second)
+		} else {
+			ticker.Reset(20 * time.Second)
+		}
+
 		go func() {
-			ticker := time.NewTicker(20 * time.Second)
 			for {
 				select {
-				case <-termC:
-					log.Trace().Msg("Canceling keep-alive ticker")
-					ticker.Stop()
-					return
 				case <-ticker.C:
 					conn.SendMessage(&Message{
 						Type: Message_Type(Message_KEEPALIVE).Enum(),
