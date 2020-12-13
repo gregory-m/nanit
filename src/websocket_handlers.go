@@ -17,7 +17,7 @@ type SensorUpdate struct {
 	Humidity    *SensorInfoPayload
 }
 
-func processSensorData(sensorData []*SensorData) {
+func processSensorData(babyUID string, sensorData []*SensorData, stateManager *StateManager) {
 	// Parse sensor update
 	sensorUpdate := &SensorUpdate{}
 	for _, sensorDataSet := range sensorData {
@@ -37,21 +37,25 @@ func processSensorData(sensorData []*SensorData) {
 	}
 
 	if sensorUpdate.Humidity != nil || sensorUpdate.Temperature != nil {
+		state := BabyState{}
 		msg := log.Debug()
 
 		if sensorUpdate.Temperature != nil {
+			state.Temperature = constRefInt32(sensorUpdate.Temperature.ValueMilli)
 			msg.Float32("temperature", float32(sensorUpdate.Temperature.ValueMilli)/1000)
 		}
 
 		if sensorUpdate.Humidity != nil {
+			state.Humidity = constRefInt32(sensorUpdate.Humidity.ValueMilli)
 			msg.Float32("humidity", float32(sensorUpdate.Humidity.ValueMilli)/1000)
 		}
 
 		msg.Msg("Received sensor data update")
+		stateManager.Update(babyUID, state)
 	}
 }
 
-func registerWebsocketHandlers(conn *WebsocketConnection, localStreamServer string) {
+func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localStreamServer string, stateManager *StateManager) {
 
 	// Send initial set of requests upon successful connection
 	conn.OnReady(func(conn *WebsocketConnection) {
@@ -115,7 +119,7 @@ func registerWebsocketHandlers(conn *WebsocketConnection, localStreamServer stri
 		// Sensor request initiated by us on start (or some other client, we don't care)
 		if *m.Type == Message_RESPONSE && m.Response != nil {
 			if *m.Response.RequestType == RequestType_GET_SENSOR_DATA && len(m.Response.SensorData) > 0 {
-				processSensorData(m.Response.SensorData)
+				processSensorData(babyUID, m.Response.SensorData, stateManager)
 			}
 		} else
 
@@ -123,7 +127,7 @@ func registerWebsocketHandlers(conn *WebsocketConnection, localStreamServer stri
 		// Note: it sends the updates periodically on its own + whenever some significant change occurs
 		if *m.Type == Message_REQUEST && m.Request != nil {
 			if *m.Request.Type == RequestType_PUT_SENSOR_DATA && len(m.Request.SensorData_) > 0 {
-				processSensorData(m.Request.SensorData_)
+				processSensorData(babyUID, m.Request.SensorData_, stateManager)
 			}
 		}
 	})

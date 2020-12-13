@@ -150,6 +150,21 @@ func main() {
 	// Fetches babies info if they are not present in session
 	api.EnsureBabies()
 
+	// State manager
+	stateManager := NewStateManager()
+
+	// MQTT
+	var mqtt *MQTTConnection
+	if EnvVarBool("NANIT_MQTT_ENABLED", false) {
+		mqtt = NewMQTTConnection(
+			EnvVarReqStr("NANIT_MQTT_BROKER_URL"),
+			EnvVarStr("NANIT_MQTT_USERNAME", ""),
+			EnvVarStr("NANIT_MQTT_PASSWORD", ""),
+		)
+
+		mqtt.Start(stateManager)
+	}
+
 	babyClosers := make([]func(), len(sessionStore.Session.Babies))
 
 	// Start reading the data from the stream
@@ -176,13 +191,17 @@ func main() {
 		}
 
 		// Local stream
+		localStreamEnabled := EnvVarBool("NANIT_LOCAL_STREAM_ENABLED", false)
 		localStreamURL := ""
-		if EnvVarBool("NANIT_LOCAL_STREAM_ENABLED", false) {
+		if localStreamEnabled {
 			localStreamURL = EnvVarReqStr("NANIT_LOCAL_STREAM_PUSH_TARGET")
+		}
 
+		// Websocket connection
+		if localStreamEnabled || mqtt != nil {
 			// Websocket connection
 			ws := NewWebsocketConnection(baby.CameraUID, sessionStore.Session, api)
-			registerWebsocketHandlers(ws, localStreamURL)
+			registerWebsocketHandlers(baby.UID, ws, localStreamURL, stateManager)
 			ws.Start()
 
 			prev := babyClosers[i]
@@ -202,6 +221,11 @@ func main() {
 		select {
 		case <-interrupt:
 			log.Warn().Msg("Received interrupt signal, terminating")
+
+			if mqtt != nil {
+				mqtt.Stop()
+			}
+
 			for _, closeBaby := range babyClosers {
 				closeBaby()
 			}
