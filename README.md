@@ -42,7 +42,8 @@ Open `rtmp://127.0.0.1:1935/live` in VLC
 
 ### Setup guides
 
-- [Home Assistant setup](https://community.home-assistant.io/t/nanit-showing-in-ha-via-nvr-zoneminder/251641) by @jaburges
+- [Home assistant](./docs/home-assistant.md)
+- [Homebridge](./docs/homebridge.md)
 
 ### Further usage
 
