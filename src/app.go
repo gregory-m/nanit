@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -194,7 +195,8 @@ func main() {
 		localStreamEnabled := EnvVarBool("NANIT_LOCAL_STREAM_ENABLED", false)
 		localStreamURL := ""
 		if localStreamEnabled {
-			localStreamURL = EnvVarReqStr("NANIT_LOCAL_STREAM_PUSH_TARGET")
+			r := strings.NewReplacer("{babyUid}", baby.UID)
+			localStreamURL = r.Replace(EnvVarReqStr("NANIT_LOCAL_STREAM_PUSH_TARGET"))
 		}
 
 		// Websocket connection
