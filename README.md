@@ -2,6 +2,16 @@
 
 This is sleepless night induced pet project to restream Nanit Baby Monitor live stream for local viewing.
 
+## Features
+
+- Restreaming of live feed
+  - Over HLS or to your local RTMP server
+  - Both local and remote streaming supported
+  - Option to run custom stream processor (like FFMPEG)
+- Retrieving sensors data from cam (temperature and humidity) and publishing them over MQTT
+- Graceful authentication session handling
+- Works as a companion for your Home-assistant / Homebridge setup (see [guides](#setup-guides) below)
+
 ## TL;DR
 
 ### a) Restream live feed as HLS
@@ -38,7 +48,7 @@ services:
 
 Open `rtmp://127.0.0.1:1935/live` in VLC
 
-**Notice:** The cam does not seem to react well if it tries to start streaming at the time when RTMP server is not ready. It is adviced to ensure nginx-rtmp is started first. If the streaming does not start in few seconds, try to restart the nanit container to reinitiate the streaming.
+**Notice:** The cam does not seem to react well if it tries to start streaming at the time when RTMP server is not ready. It is advised to ensure nginx-rtmp is started first. If the streaming does not start in few seconds, try to restart the nanit container to reinitiate the streaming.
 
 ### Setup guides
 
@@ -48,7 +58,6 @@ Open `rtmp://127.0.0.1:1935/live` in VLC
 ### Further usage
 
 Application is ready to be used in Docker. You can use environment variables for configuration. For more info see [.env.sample](.env.sample).
-
 
 ### HLS vs Local RTMP
 
