@@ -76,6 +76,9 @@ Application is ready to be used in Docker. You can use environment variables for
 ```bash
 go mod download
 go run src/*.go
+
+# On proto file change
+protoc -I=src --go_out src src/nanit.proto
 ```
 
 For some insights see [Developer notes](docs/developer-notes.md).

@@ -68,16 +68,25 @@ func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localS
 
 		// Push streaming URL
 		if localStreamServer != "" {
-			log.Info().Str("target", localStreamServer).Msg("Requesting local streaming")
+			go func() {
+				log.Info().Str("target", localStreamServer).Msg("Requesting local streaming")
 
-			conn.SendRequest(RequestType_PUT_STREAMING, Request{
-				Streaming: &Streaming{
-					Id:       StreamIdentifier(StreamIdentifier_MOBILE).Enum(),
-					RtmpUrl:  constRefStr(localStreamServer),
-					Status:   Streaming_Status(Streaming_STARTED).Enum(),
-					Attempts: constRefInt32(3),
-				},
-			})
+				awaitResponse := conn.SendRequest(RequestType_PUT_STREAMING, Request{
+					Streaming: &Streaming{
+						Id:       StreamIdentifier(StreamIdentifier_MOBILE).Enum(),
+						RtmpUrl:  constRefStr(localStreamServer),
+						Status:   Streaming_Status(Streaming_STARTED).Enum(),
+						Attempts: constRefInt32(3),
+					},
+				})
+
+				_, err := awaitResponse(30 * time.Second)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to request local streaming")
+				} else {
+					log.Info().Msg("Local streaming successfully requested")
+				}
+			}()
 		}
 
 		// Ask for logs

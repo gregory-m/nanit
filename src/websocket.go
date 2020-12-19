@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	sync "sync"
 	"sync/atomic"
@@ -12,6 +13,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type UnhandledRequest struct {
+	Request        *Request
+	HandleResponse func(response *Response)
+}
+
 type WebsocketConnection struct {
 	CameraUID     string
 	Session       *AppSession
@@ -20,6 +26,9 @@ type WebsocketConnection struct {
 	Attempter     *Attempter
 	LastRequestID int32
 
+	UnhandledRequests     map[int32]UnhandledRequest
+	UnhandledRequestsLock sync.Mutex
+
 	HandleReady       func(*WebsocketConnection)
 	HandleTermination func()
 	HandleMessage     func(*Message, *WebsocketConnection)
@@ -27,10 +36,22 @@ type WebsocketConnection struct {
 
 func NewWebsocketConnection(cameraUID string, session *AppSession, api *NanitClient) *WebsocketConnection {
 	return &WebsocketConnection{
-		CameraUID:     cameraUID,
-		Session:       session,
-		API:           api,
-		LastRequestID: 0,
+		CameraUID:         cameraUID,
+		Session:           session,
+		API:               api,
+		LastRequestID:     0,
+		UnhandledRequests: make(map[int32]UnhandledRequest),
+		HandleMessage: func(m *Message, conn *WebsocketConnection) {
+			if *m.Type == Message_RESPONSE && m.Response != nil {
+				conn.UnhandledRequestsLock.Lock()
+				unhandled, ok := conn.UnhandledRequests[*m.Response.RequestId]
+				conn.UnhandledRequestsLock.Unlock()
+
+				if ok && *m.Response.RequestType == *unhandled.Request.Type {
+					unhandled.HandleResponse(m.Response)
+				}
+			}
+		},
 	}
 }
 
@@ -82,13 +103,9 @@ func (conn *WebsocketConnection) OnTermination(handler func()) {
 
 func (conn *WebsocketConnection) OnMessage(handler func(*Message, *WebsocketConnection)) {
 	prev := conn.HandleMessage
-	if prev != nil {
-		conn.HandleMessage = func(m *Message, conn *WebsocketConnection) {
-			prev(m, conn)
-			handler(m, conn)
-		}
-	} else {
-		conn.HandleMessage = handler
+	conn.HandleMessage = func(m *Message, conn *WebsocketConnection) {
+		prev(m, conn)
+		handler(m, conn)
 	}
 }
 
@@ -109,7 +126,7 @@ func (conn *WebsocketConnection) SendMessage(m *Message) {
 	conn.Socket.SendBinary(bytes)
 }
 
-func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Request) {
+func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Request) func(time.Duration) (*Response, error) {
 	id := atomic.AddInt32(&conn.LastRequestID, 1)
 
 	requestData.Id = constRefInt32(id)
@@ -121,6 +138,48 @@ func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Re
 	}
 
 	conn.SendMessage(m)
+
+	return func(timeout time.Duration) (*Response, error) {
+		resC := make(chan *Response, 1)
+
+		defer func() {
+			conn.UnhandledRequestsLock.Lock()
+			delete(conn.UnhandledRequests, id)
+			conn.UnhandledRequestsLock.Unlock()
+		}()
+
+		conn.UnhandledRequestsLock.Lock()
+		conn.UnhandledRequests[id] = UnhandledRequest{
+			Request: m.Request,
+			HandleResponse: func(res *Response) {
+				resC <- res
+			},
+		}
+		conn.UnhandledRequestsLock.Unlock()
+
+		timer := time.NewTimer(timeout)
+
+		select {
+		case <-timer.C:
+			close(resC)
+			return nil, errors.New("Request timeout")
+		case res := <-resC:
+			timer.Stop()
+			close(resC)
+
+			if res.StatusCode == nil {
+				return res, errors.New("No status code received")
+			} else if *res.StatusCode != 200 {
+				if res.GetStatusMessage() != "" {
+					return res, errors.New(res.GetStatusMessage())
+				}
+
+				return res, fmt.Errorf("Unexpected status code %v", *res.StatusCode)
+			}
+
+			return res, nil
+		}
+	}
 }
 
 func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
@@ -147,7 +206,7 @@ func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
 	conn.Socket.OnConnected = func(socket gowebsocket.Socket) {
 		log.Info().Str("url", url).Msg("Connected to websocket")
 		if conn.HandleReady != nil {
-			conn.HandleReady(conn)
+			go conn.HandleReady(conn)
 		}
 	}
 

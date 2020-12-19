@@ -238,6 +238,7 @@ message Response {
   required int32 requestId = 1;
   required RequestType requestType = 2;
   required int32 statusCode = 3;
+  optional string statusMessage = 4;
 
   repeated SensorData sensorData = 9;
   optional Settings settings = 6;
