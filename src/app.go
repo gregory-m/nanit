@@ -13,8 +13,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Injected on CI (from CI_COMMIT_SHORT_SHA)
+// GitCommit - Injected on CI (from CI_COMMIT_SHORT_SHA)
 var GitCommit string
+
+const (
+	// AuthTokenTimelife - Time duration after which we assume auth token expired
+	AuthTokenTimelife = 10 * time.Minute
+)
 
 func loadDotEnvFile() {
 	absFilepath, filePathErr := filepath.Abs(".env")
@@ -147,6 +152,9 @@ func main() {
 		Password:     EnvVarReqStr("NANIT_PASSWORD"),
 		SessionStore: sessionStore,
 	}
+
+	// Reauthorize if we don't have a token or assume it is invalid
+	api.MaybeAuthorize(false)
 
 	// Fetches babies info if they are not present in session
 	api.EnsureBabies()

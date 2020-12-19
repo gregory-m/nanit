@@ -59,10 +59,8 @@ func (sp *StreamProcess) Stop() {
 }
 
 func execStreamProcess(sp *StreamProcess, attempt *Attempt) error {
-	// Reauthorize if it is not a first try or if the session is older then 10 minutes
-	if attempt.Number > 1 || time.Since(sp.Session.AuthTime) > 10*time.Minute {
-		sp.API.Authorize()
-	}
+	// Reauthorize if it is not a first try or we assume we don't have a valid token
+	sp.API.MaybeAuthorize(attempt.Number > 1)
 
 	logFilename := filepath.Join(sp.DataDirectories.LogDir, fmt.Sprintf("process-%v-%v.log", sp.BabyUID, time.Now().Format(time.RFC3339)))
 	url := fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", sp.BabyUID, sp.Session.AuthToken)

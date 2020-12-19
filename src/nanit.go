@@ -53,6 +53,13 @@ func (c *NanitClient) EnsureToken() string {
 	return c.SessionStore.Session.AuthToken
 }
 
+// MaybeAuthorize - Performs authorizaiton if we don't have token or we assume it is expired
+func (c *NanitClient) MaybeAuthorize(force bool) {
+	if force || c.SessionStore.Session.AuthToken == "" || time.Since(c.SessionStore.Session.AuthTime) > AuthTokenTimelife {
+		c.Authorize()
+	}
+}
+
 func (c *NanitClient) Authorize() {
 	log.Info().Str("email", c.Email).Str("password", anonymizeToken(c.Password, 0)).Msg("Authorizing using user credentials")
 

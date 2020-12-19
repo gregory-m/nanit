@@ -124,10 +124,8 @@ func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Re
 }
 
 func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
-	// Reauthorize if it is not a first try or if the session is older then 10 minutes
-	if attempt.Number > 1 || time.Since(conn.Session.AuthTime) > 10*time.Minute {
-		conn.API.Authorize()
-	}
+	// Reauthorize if it is not a first try or we assume we don't have a valid token
+	conn.API.MaybeAuthorize(attempt.Number > 1)
 
 	// Remote
 	url := fmt.Sprintf("wss://api.nanit.com/focus/cameras/%v/user_connect", conn.CameraUID)
