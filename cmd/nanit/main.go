@@ -56,9 +56,9 @@ func main() {
 
 	instance := app.NewApp(opts)
 
-	cancel := utils.RunWithGracefulCancel(instance.Run)
+	runner := utils.RunWithGracefulCancel(instance.Run)
 
 	<-interrupt
 	log.Warn().Msg("Received interrupt signal, terminating")
-	cancel()
+	runner.Cancel()
 }
