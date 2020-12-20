@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"errors"
@@ -10,23 +10,26 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sacOO7/gowebsocket"
+	"gitlab.com/adam.stanek/nanit/pkg/session"
+	"gitlab.com/adam.stanek/nanit/pkg/utils"
 	"google.golang.org/protobuf/proto"
 )
 
-type UnhandledRequest struct {
+type unhandledRequest struct {
 	Request        *Request
 	HandleResponse func(response *Response)
 }
 
+// WebsocketConnection - connection container
 type WebsocketConnection struct {
 	CameraUID     string
-	Session       *AppSession
+	Session       *session.Session
 	API           *NanitClient
 	Socket        gowebsocket.Socket
-	Attempter     *Attempter
+	Attempter     *utils.Attempter
 	LastRequestID int32
 
-	UnhandledRequests     map[int32]UnhandledRequest
+	UnhandledRequests     map[int32]unhandledRequest
 	UnhandledRequestsLock sync.Mutex
 
 	HandleReady       func(*WebsocketConnection)
@@ -34,13 +37,14 @@ type WebsocketConnection struct {
 	HandleMessage     func(*Message, *WebsocketConnection)
 }
 
-func NewWebsocketConnection(cameraUID string, session *AppSession, api *NanitClient) *WebsocketConnection {
+// NewWebsocketConnection - constructor
+func NewWebsocketConnection(cameraUID string, session *session.Session, api *NanitClient) *WebsocketConnection {
 	return &WebsocketConnection{
 		CameraUID:         cameraUID,
 		Session:           session,
 		API:               api,
 		LastRequestID:     0,
-		UnhandledRequests: make(map[int32]UnhandledRequest),
+		UnhandledRequests: make(map[int32]unhandledRequest),
 		HandleMessage: func(m *Message, conn *WebsocketConnection) {
 			if *m.Type == Message_RESPONSE && m.Response != nil {
 				conn.UnhandledRequestsLock.Lock()
@@ -55,9 +59,10 @@ func NewWebsocketConnection(cameraUID string, session *AppSession, api *NanitCli
 	}
 }
 
+// Start - starts websocket connection attempt loop
 func (conn *WebsocketConnection) Start() {
-	conn.Attempter = NewAttempter(
-		func(attempt *Attempt) error {
+	conn.Attempter = utils.NewAttempter(
+		func(attempt *utils.Attempt) error {
 			return runWebsocket(conn, attempt)
 		},
 		[]time.Duration{
@@ -73,10 +78,12 @@ func (conn *WebsocketConnection) Start() {
 	go conn.Attempter.Run()
 }
 
+// Stop - notifies the attempt loop to stop
 func (conn *WebsocketConnection) Stop() {
 	conn.Attempter.Stop()
 }
 
+// OnReady - registers handler which will be called upon successfully established connection
 func (conn *WebsocketConnection) OnReady(handler func(*WebsocketConnection)) {
 	prev := conn.HandleReady
 	if prev != nil {
@@ -89,6 +96,7 @@ func (conn *WebsocketConnection) OnReady(handler func(*WebsocketConnection)) {
 	}
 }
 
+// OnTermination - registers handler which will be called whenever the connection gets terminated
 func (conn *WebsocketConnection) OnTermination(handler func()) {
 	prev := conn.HandleTermination
 	if prev != nil {
@@ -101,6 +109,7 @@ func (conn *WebsocketConnection) OnTermination(handler func()) {
 	}
 }
 
+// OnMessage - registers handler which will be called upon incoming message
 func (conn *WebsocketConnection) OnMessage(handler func(*Message, *WebsocketConnection)) {
 	prev := conn.HandleMessage
 	conn.HandleMessage = func(m *Message, conn *WebsocketConnection) {
@@ -109,6 +118,8 @@ func (conn *WebsocketConnection) OnMessage(handler func(*Message, *WebsocketConn
 	}
 }
 
+// SendMessage - low-level helper for sending raw message
+// Note: Use SendRequest() for requests
 func (conn *WebsocketConnection) SendMessage(m *Message) {
 	var msg *zerolog.Event
 
@@ -126,15 +137,16 @@ func (conn *WebsocketConnection) SendMessage(m *Message) {
 	conn.Socket.SendBinary(bytes)
 }
 
-func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Request) func(time.Duration) (*Response, error) {
+// SendRequest - sends request to the cam and returns await function. Await function waits for the response and returns it
+func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData *Request) func(time.Duration) (*Response, error) {
 	id := atomic.AddInt32(&conn.LastRequestID, 1)
 
-	requestData.Id = constRefInt32(id)
+	requestData.Id = utils.ConstRefInt32(id)
 	requestData.Type = RequestType(reqType).Enum()
 
 	m := &Message{
 		Type:    Message_Type(Message_REQUEST).Enum(),
-		Request: &requestData,
+		Request: requestData,
 	}
 
 	conn.SendMessage(m)
@@ -149,7 +161,7 @@ func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Re
 		}()
 
 		conn.UnhandledRequestsLock.Lock()
-		conn.UnhandledRequests[id] = UnhandledRequest{
+		conn.UnhandledRequests[id] = unhandledRequest{
 			Request: m.Request,
 			HandleResponse: func(res *Response) {
 				resC <- res
@@ -182,7 +194,7 @@ func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData Re
 	}
 }
 
-func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
+func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
 	// Reauthorize if it is not a first try or we assume we don't have a valid token
 	conn.API.MaybeAuthorize(attempt.Number > 1)
 
@@ -265,10 +277,6 @@ func runWebsocket(conn *WebsocketConnection, attempt *Attempt) error {
 		}
 	}
 }
-
-func constRefInt32(i int32) *int32 { return &i }
-func constRefBool(b bool) *bool    { return &b }
-func constRefStr(s string) *string { return &s }
 
 func getMessageBytes(data *Message) []byte {
 	out, err := proto.Marshal(data)

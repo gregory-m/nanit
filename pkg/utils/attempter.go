@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"time"
@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Attempt - holds state of a single attempt
 type Attempt struct {
 	Number      int
 	ScheduledAt time.Time
@@ -14,6 +15,7 @@ type Attempt struct {
 	Running     bool
 }
 
+// NewAttempt - constructor
 func NewAttempt(number int, scheduledAt time.Time) *Attempt {
 	return &Attempt{
 		Number:      number,
@@ -22,6 +24,7 @@ func NewAttempt(number int, scheduledAt time.Time) *Attempt {
 	}
 }
 
+// Attempter - holds configuration and current state of attempter
 type Attempter struct {
 	Handler func(*Attempt) error
 
@@ -30,18 +33,17 @@ type Attempter struct {
 
 	CurrentAttempt *Attempt
 
-	/**
-	 * List of cooldown periods for failed attempts.
-	 * If execution fails more times than length of this array, last item is used.
-	 */
+	// Cooldown - List of cooldown periods for failed attempts.
+	// If execution fails more times than length of this array, last item is used.
 	Cooldown []time.Duration
 
-	/** After this time failed attempts are counted as first failure */
+	// ResetThreshold - After this time failed attempts are counted as first failure
 	ResetThreshold time.Duration
 
 	HasFinished bool
 }
 
+// NewAttempter - constructor
 func NewAttempter(handler func(*Attempt) error, cooldown []time.Duration, resetThreshold time.Duration) *Attempter {
 	attempter := &Attempter{
 		AttemptC:       make(chan *Attempt, 1),
@@ -73,7 +75,7 @@ func failAttempt(attempter *Attempter, attempt *Attempt, err error) {
 	if nextTryNumber == 1 || len(attempter.Cooldown) == 0 {
 		attempter.AttemptC <- NewAttempt(1, now)
 	} else {
-		cooldown := attempter.Cooldown[minInt(nextTryNumber-1, len(attempter.Cooldown))-1]
+		cooldown := attempter.Cooldown[MinInt(nextTryNumber-1, len(attempter.Cooldown))-1]
 		if cooldown > timeAgo {
 			attempter.AttemptC <- NewAttempt(nextTryNumber, now.Add(cooldown-timeAgo))
 		} else {
@@ -82,6 +84,7 @@ func failAttempt(attempter *Attempter, attempt *Attempt, err error) {
 	}
 }
 
+// Run - triggers attempter main loop
 func (attempter *Attempter) Run() {
 	timer := time.NewTimer(0)
 	attempt := NewAttempt(1, time.Now())
@@ -127,6 +130,8 @@ func (attempter *Attempter) Run() {
 	}
 }
 
+// Stop - notifies attempter to stop the current run and prevents him from scheduling the next one.
+// This will cause Run() to return.
 func (attempter *Attempter) Stop() {
 	if !attempter.HasFinished {
 		attempt := attempter.CurrentAttempt
@@ -138,13 +143,4 @@ func (attempter *Attempter) Stop() {
 		attempter.InterruptC <- func() { waitC <- true }
 		<-waitC
 	}
-}
-
-// Go doesn't have Min function??
-func minInt(a int, b int) int {
-	if a > b {
-		return b
-	}
-
-	return a
 }

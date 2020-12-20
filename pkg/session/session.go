@@ -1,34 +1,42 @@
-package main
+package session
 
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"gitlab.com/adam.stanek/nanit/pkg/baby"
 )
 
-const REVISION = 2
+// Revision - marks the version of the structure of a session file. Only files with equal revision will be loaded
+// Note: you should increment this whenever you change the Session structure
+const Revision = 2
 
-type AppSession struct {
-	Revision  int       `json:"revision"`
-	AuthToken string    `json:"authToken"`
-	AuthTime  time.Time `json:"authTime"`
-	Babies    []Baby    `json:"babies"`
+// Session - application session data container
+type Session struct {
+	Revision  int         `json:"revision"`
+	AuthToken string      `json:"authToken"`
+	AuthTime  time.Time   `json:"authTime"`
+	Babies    []baby.Baby `json:"babies"`
 }
 
-type AppSessionStore struct {
+// Store - application session store context
+type Store struct {
 	Filename string
-	Session  *AppSession
+	Session  *Session
 }
 
-func NewAppSessionStore() *AppSessionStore {
-	return &AppSessionStore{
-		Session: &AppSession{Revision: REVISION},
+// NewSessionStore - constructor
+func NewSessionStore() *Store {
+	return &Store{
+		Session: &Session{Revision: Revision},
 	}
 }
 
-func (store *AppSessionStore) Load() {
+// Load - loads previous state from a file
+func (store *Store) Load() {
 	if _, err := os.Stat(store.Filename); os.IsNotExist(err) {
 		log.Info().Str("filename", store.Filename).Msg("No app session file found")
 		return
@@ -41,13 +49,13 @@ func (store *AppSessionStore) Load() {
 
 	defer f.Close()
 
-	session := &AppSession{}
+	session := &Session{}
 	jsonErr := json.NewDecoder(f).Decode(session)
 	if jsonErr != nil {
 		log.Fatal().Str("filename", store.Filename).Err(jsonErr).Msg("Unable to decode app session file")
 	}
 
-	if session.Revision == REVISION {
+	if session.Revision == Revision {
 		store.Session = session
 		log.Info().Str("filename", store.Filename).Msg("Loaded app session from the file")
 	} else {
@@ -56,7 +64,8 @@ func (store *AppSessionStore) Load() {
 
 }
 
-func (store *AppSessionStore) Save() {
+// Save - stores current data in a file
+func (store *Store) Save() {
 	if store.Filename == "" {
 		return
 	}
@@ -79,4 +88,23 @@ func (store *AppSessionStore) Save() {
 	if writeErr != nil {
 		log.Fatal().Str("filename", store.Filename).Err(writeErr).Msg("Unable to wrote to app session file")
 	}
+}
+
+// InitSessionStore - Initializes new application session store
+func InitSessionStore(sessionFile string) *Store {
+	sessionStore := NewSessionStore()
+
+	// Load previous state of the application from session file
+	if sessionFile != "" {
+
+		absFileName, filePathErr := filepath.Abs(sessionFile)
+		if filePathErr != nil {
+			log.Fatal().Str("path", sessionFile).Err(filePathErr).Msg("Unable to retrieve absolute file path")
+		}
+
+		sessionStore.Filename = absFileName
+		sessionStore.Load()
+	}
+
+	return sessionStore
 }

@@ -1,13 +1,15 @@
-package main
+package client
 
 import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"gitlab.com/adam.stanek/nanit/pkg/baby"
+	"gitlab.com/adam.stanek/nanit/pkg/session"
+	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
 
 var myClient = &http.Client{Timeout: 10 * time.Second}
@@ -18,39 +20,17 @@ type authResponsePayload struct {
 	AccessToken string `json:"access_token"`
 }
 
-type Baby struct {
-	UID       string `json:"uid"`
-	Name      string `json:"name"`
-	CameraUID string `json:"camera_uid"`
-}
-
 type babiesResponsePayload struct {
-	Babies []Baby `json:"babies"`
+	Babies []baby.Baby `json:"babies"`
 }
 
 // ------------------------------------------
 
+// NanitClient - client context
 type NanitClient struct {
 	Email        string
 	Password     string
-	SessionStore *AppSessionStore
-}
-
-func anonymizeToken(token string, clearLen int) string {
-	if clearLen != 0 && (len(token)-2*clearLen) > 6 {
-		runes := []rune(token)
-		return string(runes[0:clearLen]) + strings.Repeat("*", len(token)-2*clearLen) + string(runes[len(token)-clearLen:])
-	}
-
-	return strings.Repeat("*", len(token))
-}
-
-func (c *NanitClient) EnsureToken() string {
-	if c.SessionStore.Session.AuthToken == "" {
-		c.Authorize()
-	}
-
-	return c.SessionStore.Session.AuthToken
+	SessionStore *session.Store
 }
 
 // MaybeAuthorize - Performs authorizaiton if we don't have token or we assume it is expired
@@ -60,8 +40,9 @@ func (c *NanitClient) MaybeAuthorize(force bool) {
 	}
 }
 
+// Authorize - performs authorization attempt, panics if it fails
 func (c *NanitClient) Authorize() {
-	log.Info().Str("email", c.Email).Str("password", anonymizeToken(c.Password, 0)).Msg("Authorizing using user credentials")
+	log.Info().Str("email", c.Email).Str("password", utils.AnonymizeToken(c.Password, 0)).Msg("Authorizing using user credentials")
 
 	requestBody, requestBodyErr := json.Marshal(map[string]string{
 		"email":    c.Email,
@@ -92,12 +73,13 @@ func (c *NanitClient) Authorize() {
 		log.Fatal().Err(jsonErr).Msg("Unable to decode response")
 	}
 
-	log.Info().Str("token", anonymizeToken(authResponse.AccessToken, 4)).Msg("Authorized")
+	log.Info().Str("token", utils.AnonymizeToken(authResponse.AccessToken, 4)).Msg("Authorized")
 	c.SessionStore.Session.AuthToken = authResponse.AccessToken
 	c.SessionStore.Session.AuthTime = time.Now()
 	c.SessionStore.Save()
 }
 
+// FetchAuthorized - makes authorized http request
 func (c *NanitClient) FetchAuthorized(req *http.Request, data interface{}) {
 	for i := 0; i < 2; i++ {
 		if c.SessionStore.Session.AuthToken != "" {
@@ -132,7 +114,8 @@ func (c *NanitClient) FetchAuthorized(req *http.Request, data interface{}) {
 	log.Fatal().Msg("Unable to make request due failed authorization (2 attempts).")
 }
 
-func (c *NanitClient) FetchBabies() []Baby {
+// FetchBabies - fetches baby list
+func (c *NanitClient) FetchBabies() []baby.Baby {
 	log.Info().Msg("Fetching babies list")
 	req, reqErr := http.NewRequest("GET", "https://api.nanit.com/babies", nil)
 
@@ -148,7 +131,8 @@ func (c *NanitClient) FetchBabies() []Baby {
 	return data.Babies
 }
 
-func (c *NanitClient) EnsureBabies() []Baby {
+// EnsureBabies - fetches baby list if not fetched already
+func (c *NanitClient) EnsureBabies() []baby.Baby {
 	if len(c.SessionStore.Session.Babies) == 0 {
 		return c.FetchBabies()
 	}

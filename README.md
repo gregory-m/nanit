@@ -83,11 +83,10 @@ Application is ready to be used in Docker. You can use environment variables for
 ## How to develop
 
 ```bash
-go mod download
-go run src/*.go
+go run cmd/nanit/*.go
 
 # On proto file change
-protoc -I=src --go_out src src/nanit.proto
+protoc --go_out . --go_opt=paths=source_relative pkg/client/websocket.proto
 ```
 
 For some insights see [Developer notes](docs/developer-notes.md).

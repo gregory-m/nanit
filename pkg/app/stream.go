@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"errors"
@@ -10,20 +10,26 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"gitlab.com/adam.stanek/nanit/pkg/baby"
+	"gitlab.com/adam.stanek/nanit/pkg/client"
+	"gitlab.com/adam.stanek/nanit/pkg/session"
+	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
 
+// StreamProcess - stream process opts
 type StreamProcess struct {
 	CommandTemplate string
 	BabyUID         string
-	Attempter       *Attempter
-	API             *NanitClient
-	Session         *AppSession
+	Attempter       *utils.Attempter
+	API             *client.NanitClient
+	Session         *session.Session
 	DataDirectories DataDirectories
 }
 
-func NewStreamProcess(cmdTemplate string, babyUID string, session *AppSession, api *NanitClient, dataDirs DataDirectories) *StreamProcess {
+// NewStreamProcess - constructor
+func NewStreamProcess(cmdTemplate string, babyUID string, session *session.Session, api *client.NanitClient, dataDirs DataDirectories) *StreamProcess {
 	// Check babyUID does not contain and bad characters (we use it as part of the file paths)
-	ensureValidBabyUID(babyUID)
+	baby.EnsureValidBabyUID(babyUID)
 
 	sp := &StreamProcess{
 		CommandTemplate: cmdTemplate,
@@ -36,9 +42,10 @@ func NewStreamProcess(cmdTemplate string, babyUID string, session *AppSession, a
 	return sp
 }
 
+// Start - starts streaming attempt
 func (sp *StreamProcess) Start() {
-	sp.Attempter = NewAttempter(
-		func(attempt *Attempt) error {
+	sp.Attempter = utils.NewAttempter(
+		func(attempt *utils.Attempt) error {
 			return execStreamProcess(sp, attempt)
 		},
 		[]time.Duration{
@@ -54,11 +61,12 @@ func (sp *StreamProcess) Start() {
 	go sp.Attempter.Run()
 }
 
+// Stop - stops any ongoing streaming attempts and prevent any future from starting
 func (sp *StreamProcess) Stop() {
 	sp.Attempter.Stop()
 }
 
-func execStreamProcess(sp *StreamProcess, attempt *Attempt) error {
+func execStreamProcess(sp *StreamProcess, attempt *utils.Attempt) error {
 	// Reauthorize if it is not a first try or we assume we don't have a valid token
 	sp.API.MaybeAuthorize(attempt.Number > 1)
 

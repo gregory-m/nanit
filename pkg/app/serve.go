@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"gitlab.com/adam.stanek/nanit/pkg/baby"
 )
 
-func serve(babies []Baby, dataDir DataDirectories) {
+func serve(babies []baby.Baby, dataDir DataDirectories) {
 	const port = 8080
 
 	// Index handler

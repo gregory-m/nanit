@@ -1,34 +1,37 @@
-package main
+package app
 
 import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"gitlab.com/adam.stanek/nanit/pkg/baby"
+	"gitlab.com/adam.stanek/nanit/pkg/client"
+	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
 
-type SensorInfoPayload struct {
+type sensorInfoPayload struct {
 	Value      int32
 	ValueMilli int32
 	IsAlert    bool
 }
 
-type SensorUpdate struct {
-	Temperature *SensorInfoPayload
-	Humidity    *SensorInfoPayload
+type sensorUpdatePayload struct {
+	Temperature *sensorInfoPayload
+	Humidity    *sensorInfoPayload
 }
 
-func processSensorData(babyUID string, sensorData []*SensorData, stateManager *StateManager) {
+func processSensorData(babyUID string, sensorData []*client.SensorData, stateManager *baby.StateManager) {
 	// Parse sensor update
-	sensorUpdate := &SensorUpdate{}
+	sensorUpdate := &sensorUpdatePayload{}
 	for _, sensorDataSet := range sensorData {
-		if *sensorDataSet.SensorType == SensorType_TEMPERATURE {
-			sensorUpdate.Temperature = &SensorInfoPayload{
+		if *sensorDataSet.SensorType == client.SensorType_TEMPERATURE {
+			sensorUpdate.Temperature = &sensorInfoPayload{
 				Value:      *sensorDataSet.Value,
 				ValueMilli: *sensorDataSet.ValueMilli,
 				IsAlert:    *sensorDataSet.IsAlert,
 			}
-		} else if *sensorDataSet.SensorType == SensorType_HUMIDITY {
-			sensorUpdate.Humidity = &SensorInfoPayload{
+		} else if *sensorDataSet.SensorType == client.SensorType_HUMIDITY {
+			sensorUpdate.Humidity = &sensorInfoPayload{
 				Value:      *sensorDataSet.Value,
 				ValueMilli: *sensorDataSet.ValueMilli,
 				IsAlert:    *sensorDataSet.IsAlert,
@@ -37,16 +40,16 @@ func processSensorData(babyUID string, sensorData []*SensorData, stateManager *S
 	}
 
 	if sensorUpdate.Humidity != nil || sensorUpdate.Temperature != nil {
-		state := BabyState{}
+		state := baby.State{}
 		msg := log.Debug()
 
 		if sensorUpdate.Temperature != nil {
-			state.Temperature = constRefInt32(sensorUpdate.Temperature.ValueMilli)
+			state.Temperature = utils.ConstRefInt32(sensorUpdate.Temperature.ValueMilli)
 			msg.Float32("temperature", float32(sensorUpdate.Temperature.ValueMilli)/1000)
 		}
 
 		if sensorUpdate.Humidity != nil {
-			state.Humidity = constRefInt32(sensorUpdate.Humidity.ValueMilli)
+			state.Humidity = utils.ConstRefInt32(sensorUpdate.Humidity.ValueMilli)
 			msg.Float32("humidity", float32(sensorUpdate.Humidity.ValueMilli)/1000)
 		}
 
@@ -55,14 +58,14 @@ func processSensorData(babyUID string, sensorData []*SensorData, stateManager *S
 	}
 }
 
-func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localStreamServer string, stateManager *StateManager) {
+func registerWebsocketHandlers(babyUID string, conn *client.WebsocketConnection, localStreamServer string, stateManager *baby.StateManager) {
 
 	// Send initial set of requests upon successful connection
-	conn.OnReady(func(conn *WebsocketConnection) {
+	conn.OnReady(func(conn *client.WebsocketConnection) {
 		// Ask for sensor data (initial request)
-		conn.SendRequest(RequestType_GET_SENSOR_DATA, Request{
-			GetSensorData: &GetSensorData{
-				All: constRefBool(true),
+		conn.SendRequest(client.RequestType_GET_SENSOR_DATA, &client.Request{
+			GetSensorData: &client.GetSensorData{
+				All: utils.ConstRefBool(true),
 			},
 		})
 
@@ -71,12 +74,12 @@ func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localS
 			go func() {
 				log.Info().Str("target", localStreamServer).Msg("Requesting local streaming")
 
-				awaitResponse := conn.SendRequest(RequestType_PUT_STREAMING, Request{
-					Streaming: &Streaming{
-						Id:       StreamIdentifier(StreamIdentifier_MOBILE).Enum(),
-						RtmpUrl:  constRefStr(localStreamServer),
-						Status:   Streaming_Status(Streaming_STARTED).Enum(),
-						Attempts: constRefInt32(3),
+				awaitResponse := conn.SendRequest(client.RequestType_PUT_STREAMING, &client.Request{
+					Streaming: &client.Streaming{
+						Id:       client.StreamIdentifier(client.StreamIdentifier_MOBILE).Enum(),
+						RtmpUrl:  utils.ConstRefStr(localStreamServer),
+						Status:   client.Streaming_Status(client.Streaming_STARTED).Enum(),
+						Attempts: utils.ConstRefInt32(3),
 					},
 				})
 
@@ -106,7 +109,7 @@ func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localS
 		}
 	})
 
-	conn.OnReady(func(conn *WebsocketConnection) {
+	conn.OnReady(func(conn *client.WebsocketConnection) {
 		if ticker == nil {
 			ticker = time.NewTicker(20 * time.Second)
 		} else {
@@ -117,8 +120,8 @@ func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localS
 			for {
 				select {
 				case <-ticker.C:
-					conn.SendMessage(&Message{
-						Type: Message_Type(Message_KEEPALIVE).Enum(),
+					conn.SendMessage(&client.Message{
+						Type: client.Message_Type(client.Message_KEEPALIVE).Enum(),
 					})
 				}
 			}
@@ -126,18 +129,18 @@ func registerWebsocketHandlers(babyUID string, conn *WebsocketConnection, localS
 	})
 
 	// Reading sensor data
-	conn.OnMessage(func(m *Message, conn *WebsocketConnection) {
+	conn.OnMessage(func(m *client.Message, conn *client.WebsocketConnection) {
 		// Sensor request initiated by us on start (or some other client, we don't care)
-		if *m.Type == Message_RESPONSE && m.Response != nil {
-			if *m.Response.RequestType == RequestType_GET_SENSOR_DATA && len(m.Response.SensorData) > 0 {
+		if *m.Type == client.Message_RESPONSE && m.Response != nil {
+			if *m.Response.RequestType == client.RequestType_GET_SENSOR_DATA && len(m.Response.SensorData) > 0 {
 				processSensorData(babyUID, m.Response.SensorData, stateManager)
 			}
 		} else
 
 		// Communication initiated from a cam
 		// Note: it sends the updates periodically on its own + whenever some significant change occurs
-		if *m.Type == Message_REQUEST && m.Request != nil {
-			if *m.Request.Type == RequestType_PUT_SENSOR_DATA && len(m.Request.SensorData_) > 0 {
+		if *m.Type == client.Message_REQUEST && m.Request != nil {
+			if *m.Request.Type == client.RequestType_PUT_SENSOR_DATA && len(m.Request.SensorData_) > 0 {
 				processSensorData(babyUID, m.Request.SensorData_, stateManager)
 			}
 		}
