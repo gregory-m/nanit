@@ -44,7 +44,7 @@ func (conn *Connection) Run(manager *baby.StateManager, ctx utils.GracefulContex
 func runMqtt(conn *Connection, attempt *utils.Attempt) error {
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker(conn.Opts.BrokerURL)
-	opts.SetClientID("nanit")
+	opts.SetClientID(conn.Opts.TopicPrefix)
 	opts.SetUsername(conn.Opts.Username)
 	opts.SetPassword(conn.Opts.Password)
 	opts.SetCleanSession(false)
@@ -59,7 +59,7 @@ func runMqtt(conn *Connection, attempt *utils.Attempt) error {
 
 	unsubscribe := conn.StateManager.Subscribe(func(babyUID string, state baby.State) {
 		for key, value := range state.AsMap() {
-			topic := fmt.Sprintf("nanit/babies/%v/%v", babyUID, key)
+			topic := fmt.Sprintf("%v/babies/%v/%v", conn.Opts.TopicPrefix, babyUID, key)
 			log.Trace().Str("topic", topic).Interface("value", value).Msg("MQTT publish")
 
 			token := client.Publish(topic, 0, false, fmt.Sprintf("%v", value))
