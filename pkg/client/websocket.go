@@ -261,7 +261,7 @@ func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
 				conn.HandleTermination()
 			}
 			return err
-		case <-attempt.InterruptC:
+		case <-attempt.Done():
 			log.Debug().Msg("Closing websocket on interrupt")
 			if conn.HandleTermination != nil {
 				conn.HandleTermination()

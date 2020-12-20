@@ -10,9 +10,8 @@ import (
 type Attempt struct {
 	Number      int
 	ScheduledAt time.Time
-	InterruptC  chan bool
-	DoneC       chan bool
-	Running     bool
+
+	interruptC chan struct{}
 }
 
 // NewAttempt - constructor
@@ -20,9 +19,16 @@ func NewAttempt(number int, scheduledAt time.Time) *Attempt {
 	return &Attempt{
 		Number:      number,
 		ScheduledAt: scheduledAt,
-		InterruptC:  make(chan bool, 1),
+		interruptC:  make(chan struct{}, 1),
 	}
 }
+
+// Done - waits for interruption
+func (a *Attempt) Done() <-chan struct{} {
+	return a.interruptC
+}
+
+// ----------------------
 
 // Attempter - holds configuration and current state of attempter
 type Attempter struct {
@@ -136,7 +142,7 @@ func (attempter *Attempter) Stop() {
 	if !attempter.HasFinished {
 		attempt := attempter.CurrentAttempt
 		if attempt != nil {
-			attempt.InterruptC <- true
+			close(attempt.interruptC)
 		}
 
 		waitC := make(chan bool, 1)

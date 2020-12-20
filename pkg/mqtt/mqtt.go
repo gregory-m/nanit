@@ -70,7 +70,7 @@ func runMqtt(conn *Connection, attempt *utils.Attempt) error {
 	})
 
 	// Wait until interrupt signal is received
-	<-attempt.InterruptC
+	<-attempt.Done()
 
 	log.Debug().Msg("Closing MQTT connection on interrupt")
 	unsubscribe()

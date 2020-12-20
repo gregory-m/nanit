@@ -165,7 +165,7 @@ func (app *App) runStreamProcess(baby baby.Baby, attempt *utils.Attempt) error {
 			log.Warn().Msg("Stream processor exited with status 0")
 			return errors.New("Stream processor exited with status 0")
 
-		case <-attempt.InterruptC:
+		case <-attempt.Done():
 			log.Info().Msg("Terminating stream processor")
 			if err := cmd.Process.Kill(); err != nil {
 				log.Error().Err(err).Msg("Unable to kill process")
