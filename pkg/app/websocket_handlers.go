@@ -9,52 +9,30 @@ import (
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
 
-type sensorInfoPayload struct {
-	Value      int32
-	ValueMilli int32
-	IsAlert    bool
-}
-
-type sensorUpdatePayload struct {
-	Temperature *sensorInfoPayload
-	Humidity    *sensorInfoPayload
-}
-
 func processSensorData(babyUID string, sensorData []*client.SensorData, stateManager *baby.StateManager) {
 	// Parse sensor update
-	sensorUpdate := &sensorUpdatePayload{}
+	stateUpdate := baby.State{}
 	for _, sensorDataSet := range sensorData {
 		if *sensorDataSet.SensorType == client.SensorType_TEMPERATURE {
-			sensorUpdate.Temperature = &sensorInfoPayload{
-				Value:      *sensorDataSet.Value,
-				ValueMilli: *sensorDataSet.ValueMilli,
-				IsAlert:    *sensorDataSet.IsAlert,
-			}
+			stateUpdate.SetTemperatureMilli(*sensorDataSet.ValueMilli)
 		} else if *sensorDataSet.SensorType == client.SensorType_HUMIDITY {
-			sensorUpdate.Humidity = &sensorInfoPayload{
-				Value:      *sensorDataSet.Value,
-				ValueMilli: *sensorDataSet.ValueMilli,
-				IsAlert:    *sensorDataSet.IsAlert,
-			}
+			stateUpdate.SetHumidityMilli(*sensorDataSet.ValueMilli)
 		}
 	}
 
-	if sensorUpdate.Humidity != nil || sensorUpdate.Temperature != nil {
-		state := baby.State{}
+	if stateUpdate.HumidityMilli != nil || stateUpdate.TemperatureMilli != nil {
 		msg := log.Debug()
 
-		if sensorUpdate.Temperature != nil {
-			state.Temperature = utils.ConstRefInt32(sensorUpdate.Temperature.ValueMilli)
-			msg.Float32("temperature", float32(sensorUpdate.Temperature.ValueMilli)/1000)
+		if stateUpdate.TemperatureMilli != nil {
+			msg.Float32("temperature", stateUpdate.GetTemperature())
 		}
 
-		if sensorUpdate.Humidity != nil {
-			state.Humidity = utils.ConstRefInt32(sensorUpdate.Humidity.ValueMilli)
-			msg.Float32("humidity", float32(sensorUpdate.Humidity.ValueMilli)/1000)
+		if stateUpdate.HumidityMilli != nil {
+			msg.Float32("humidity", stateUpdate.GetHumidity())
 		}
 
 		msg.Msg("Received sensor data update")
-		stateManager.Update(babyUID, state)
+		stateManager.Update(babyUID, stateUpdate)
 	}
 }
 

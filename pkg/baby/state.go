@@ -6,8 +6,8 @@ import (
 
 // State - struct holding information about state of a single baby
 type State struct {
-	Temperature *int32
-	Humidity    *int32
+	TemperatureMilli *int32
+	HumidityMilli    *int32
 }
 
 // Merge - Merges non-nil values of an argument to the state.
@@ -42,4 +42,34 @@ func (state *State) Merge(stateUpdate *State) *State {
 	}
 
 	return state
+}
+
+// SetTemperatureMilli - mutates temperature field, returns itself
+func (state *State) SetTemperatureMilli(value int32) *State {
+	state.TemperatureMilli = &value
+	return state
+}
+
+// GetTemperature - returns temperature as floating point
+func (state *State) GetTemperature() float32 {
+	if state.TemperatureMilli != nil {
+		return float32(*state.TemperatureMilli) / 1000
+	}
+
+	return 0
+}
+
+// SetHumidityMilli - mutates humidity field, returns itself
+func (state *State) SetHumidityMilli(value int32) *State {
+	state.HumidityMilli = &value
+	return state
+}
+
+// GetHumidity - returns humidity as floating point
+func (state *State) GetHumidity() float32 {
+	if state.HumidityMilli != nil {
+		return float32(*state.HumidityMilli) / 1000
+	}
+
+	return 0
 }
