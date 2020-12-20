@@ -2,13 +2,12 @@ package app
 
 import (
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
-	"gitlab.com/adam.stanek/nanit/pkg/session"
 )
 
-// RunOpts - application run options
-type RunOpts struct {
+// Opts - application run options
+type Opts struct {
 	NanitCredentials NanitCredentials
-	SessionStore     *session.Store
+	SessionFile      string
 	DataDirectories  DataDirectories
 	HTTPEnabled      bool
 	MQTT             *mqtt.Opts

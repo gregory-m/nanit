@@ -13,7 +13,6 @@ import (
 // Connection - MQTT context
 type Connection struct {
 	Opts         Opts
-	Attempter    *utils.Attempter
 	StateManager *baby.StateManager
 }
 
@@ -24,10 +23,11 @@ func NewConnection(opts Opts) *Connection {
 	}
 }
 
-// Start runs the mqtt connection
-func (conn *Connection) Start(manager *baby.StateManager) {
+// Run - runs the mqtt connection handler
+func (conn *Connection) Run(manager *baby.StateManager, ctx utils.GracefulContext) {
 	conn.StateManager = manager
-	conn.Attempter = utils.NewAttempter(
+
+	utils.AttempterRunWithinContext(
 		func(attempt *utils.Attempt) error {
 			return runMqtt(conn, attempt)
 		},
@@ -37,14 +37,8 @@ func (conn *Connection) Start(manager *baby.StateManager) {
 			1 * time.Minute,
 		},
 		2*time.Second,
+		ctx,
 	)
-
-	go conn.Attempter.Run()
-}
-
-// Stop closes existing connection and stops attempting to reopen it
-func (conn *Connection) Stop() {
-	conn.Attempter.Stop()
 }
 
 func runMqtt(conn *Connection, attempt *utils.Attempt) error {

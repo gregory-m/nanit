@@ -59,9 +59,9 @@ func NewWebsocketConnection(cameraUID string, session *session.Session, api *Nan
 	}
 }
 
-// Start - starts websocket connection attempt loop
-func (conn *WebsocketConnection) Start() {
-	conn.Attempter = utils.NewAttempter(
+// RunWithinContext - starts websocket connection attempt loop
+func (conn *WebsocketConnection) RunWithinContext(ctx utils.GracefulContext) {
+	utils.AttempterRunWithinContext(
 		func(attempt *utils.Attempt) error {
 			return runWebsocket(conn, attempt)
 		},
@@ -73,14 +73,8 @@ func (conn *WebsocketConnection) Start() {
 			1 * time.Hour,
 		},
 		2*time.Second,
+		ctx,
 	)
-
-	go conn.Attempter.Run()
-}
-
-// Stop - notifies the attempt loop to stop
-func (conn *WebsocketConnection) Stop() {
-	conn.Attempter.Stop()
 }
 
 // OnReady - registers handler which will be called upon successfully established connection

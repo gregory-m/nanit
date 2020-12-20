@@ -144,3 +144,16 @@ func (attempter *Attempter) Stop() {
 		<-waitC
 	}
 }
+
+// AttempterRunWithinContext - Runs attempter within given graceful context
+func AttempterRunWithinContext(handler func(*Attempt) error, cooldown []time.Duration, resetThreshold time.Duration, ctx GracefulContext) {
+	attempter := NewAttempter(
+		handler,
+		cooldown,
+		resetThreshold,
+	)
+
+	go attempter.Run()
+	<-ctx.Done()
+	attempter.Stop()
+}
