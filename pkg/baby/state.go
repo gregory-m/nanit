@@ -2,6 +2,8 @@ package baby
 
 import (
 	reflect "reflect"
+	"regexp"
+	"strings"
 
 	"github.com/rs/zerolog"
 )
@@ -9,6 +11,7 @@ import (
 // State - struct holding information about state of a single baby
 type State struct {
 	LocalStreamingInitiated *bool
+	IsNight                 *bool
 	TemperatureMilli        *int32
 	HumidityMilli           *int32
 }
@@ -47,16 +50,47 @@ func (state *State) Merge(stateUpdate *State) *State {
 	return state
 }
 
-// EnhanceLogEvent - appends non-nil properties to a log event
-func (state *State) EnhanceLogEvent(e *zerolog.Event) *zerolog.Event {
+var upperCaseRX = regexp.MustCompile("[A-Z]+")
+
+// AsMap - returns K/V map of non-nil properties
+func (state *State) AsMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
 	r := reflect.ValueOf(state).Elem()
 	t := r.Type()
 	for i := 0; i < r.NumField(); i++ {
 		f := r.Field(i)
-		if !f.IsNil() {
+		if !f.IsNil() && f.Type().Kind() == reflect.Ptr {
+			name := t.Field(i).Name
+			var value interface{}
 
-			e.Interface(t.Field(i).Name, f.Interface())
+			if f.Type().Elem().Kind() == reflect.Int32 {
+				value = f.Elem().Int()
+
+				if strings.HasSuffix(name, "Milli") {
+					name = strings.TrimSuffix(name, "Milli")
+					value = float32(value.(int64)) / 1000
+				}
+			} else {
+				value = f.Elem().Interface()
+			}
+
+			name = strings.ToLower(name[0:1]) + name[1:]
+			name = upperCaseRX.ReplaceAllStringFunc(name, func(m string) string {
+				return "_" + strings.ToLower(m)
+			})
+
+			m[name] = value
 		}
+	}
+
+	return m
+}
+
+// EnhanceLogEvent - appends non-nil properties to a log event
+func (state *State) EnhanceLogEvent(e *zerolog.Event) *zerolog.Event {
+	for key, value := range state.AsMap() {
+		e.Interface(key, value)
 	}
 
 	return e
@@ -105,4 +139,10 @@ func (state *State) GetLocalStreamingInitiated() bool {
 	}
 
 	return false
+}
+
+// SetIsNight - mutates field, returns itself
+func (state *State) SetIsNight(value bool) *State {
+	state.IsNight = &value
+	return state
 }

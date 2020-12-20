@@ -58,17 +58,13 @@ func runMqtt(conn *Connection, attempt *utils.Attempt) error {
 	log.Info().Str("broker_url", conn.Opts.BrokerURL).Msg("Successfully connected to MQTT broker")
 
 	unsubscribe := conn.StateManager.Subscribe(func(babyUID string, state baby.State) {
-		if state.TemperatureMilli != nil {
-			token := client.Publish(fmt.Sprintf("nanit/babies/%v/temperature", babyUID), 0, false, fmt.Sprintf("%v", state.GetTemperature()))
-			if token.Wait(); token.Error() != nil {
-				log.Error().Msg("Unable to publish temperature update")
-			}
-		}
+		for key, value := range state.AsMap() {
+			topic := fmt.Sprintf("nanit/babies/%v/%v", babyUID, key)
+			log.Trace().Str("topic", topic).Interface("value", value).Msg("MQTT publish")
 
-		if state.HumidityMilli != nil {
-			token := client.Publish(fmt.Sprintf("nanit/babies/%v/humidity", babyUID), 0, false, fmt.Sprintf("%v", state.GetHumidity()))
+			token := client.Publish(topic, 0, false, fmt.Sprintf("%v", value))
 			if token.Wait(); token.Error() != nil {
-				log.Error().Msg("Unable to publish humidity update")
+				log.Error().Err(token.Error()).Msgf("Unable to publish %v update", key)
 			}
 		}
 	})

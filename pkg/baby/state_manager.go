@@ -41,7 +41,7 @@ func (manager *StateManager) Update(babyUID string, stateUpdate State) {
 	manager.babiesByUID[babyUID] = *newState
 	stateUpdate.EnhanceLogEvent(log.Debug().Str("baby_uid", babyUID)).Msg("Baby state updated")
 
-	go manager.notifySubscribers(babyUID, *newState)
+	go manager.notifySubscribers(babyUID, stateUpdate)
 }
 
 // Subscribe - registers function to be called on every update
