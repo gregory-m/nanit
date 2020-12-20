@@ -2,21 +2,23 @@ package baby
 
 import (
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 // StateManager - state manager context
 type StateManager struct {
-	BabiesByUID      map[string]State
-	Subscribers      map[*chan bool]func(babyUID string, state State)
-	StateMutex       sync.RWMutex
-	SubscribersMutex sync.RWMutex
+	babiesByUID      map[string]State
+	subscribers      map[*chan bool]func(babyUID string, state State)
+	stateMutex       sync.RWMutex
+	subscribersMutex sync.RWMutex
 }
 
 // NewStateManager - state manager constructor
 func NewStateManager() *StateManager {
 	return &StateManager{
-		BabiesByUID: make(map[string]State),
-		Subscribers: make(map[*chan bool]func(babyUID string, state State)),
+		babiesByUID: make(map[string]State),
+		subscribers: make(map[*chan bool]func(babyUID string, state State)),
 	}
 }
 
@@ -24,10 +26,10 @@ func NewStateManager() *StateManager {
 func (manager *StateManager) Update(babyUID string, stateUpdate State) {
 	var newState *State
 
-	manager.StateMutex.Lock()
-	defer manager.StateMutex.Unlock()
+	manager.stateMutex.Lock()
+	defer manager.stateMutex.Unlock()
 
-	if babyState, ok := manager.BabiesByUID[babyUID]; ok {
+	if babyState, ok := manager.babiesByUID[babyUID]; ok {
 		newState = babyState.Merge(&stateUpdate)
 		if newState == &babyState {
 			return
@@ -36,7 +38,9 @@ func (manager *StateManager) Update(babyUID string, stateUpdate State) {
 		newState = (&State{}).Merge(&stateUpdate)
 	}
 
-	manager.BabiesByUID[babyUID] = *newState
+	manager.babiesByUID[babyUID] = *newState
+	stateUpdate.EnhanceLogEvent(log.Debug().Str("baby_uid", babyUID)).Msg("Baby state updated")
+
 	go manager.notifySubscribers(babyUID, *newState)
 }
 
@@ -45,30 +49,39 @@ func (manager *StateManager) Update(babyUID string, stateUpdate State) {
 func (manager *StateManager) Subscribe(callback func(babyUID string, state State)) func() {
 	unsubscribeC := make(chan bool, 1)
 
-	manager.SubscribersMutex.Lock()
-	manager.Subscribers[&unsubscribeC] = callback
-	manager.SubscribersMutex.Unlock()
+	manager.subscribersMutex.Lock()
+	manager.subscribers[&unsubscribeC] = callback
+	manager.subscribersMutex.Unlock()
 
-	manager.StateMutex.RLock()
-	for babyUID, babyState := range manager.BabiesByUID {
+	manager.stateMutex.RLock()
+	for babyUID, babyState := range manager.babiesByUID {
 		go callback(babyUID, babyState)
 	}
 
-	manager.StateMutex.RUnlock()
+	manager.stateMutex.RUnlock()
 
 	return func() {
-		manager.SubscribersMutex.Lock()
-		delete(manager.Subscribers, &unsubscribeC)
-		manager.SubscribersMutex.Unlock()
+		manager.subscribersMutex.Lock()
+		delete(manager.subscribers, &unsubscribeC)
+		manager.subscribersMutex.Unlock()
 	}
 }
 
-func (manager *StateManager) notifySubscribers(babyUID string, state State) {
-	manager.SubscribersMutex.RLock()
+// GetBabyState - returns current state of a baby
+func (manager *StateManager) GetBabyState(babyUID string) State {
+	manager.stateMutex.RLock()
+	babyState := manager.babiesByUID[babyUID]
+	manager.stateMutex.RUnlock()
 
-	for _, callback := range manager.Subscribers {
+	return babyState
+}
+
+func (manager *StateManager) notifySubscribers(babyUID string, state State) {
+	manager.subscribersMutex.RLock()
+
+	for _, callback := range manager.subscribers {
 		go callback(babyUID, state)
 	}
 
-	manager.SubscribersMutex.RUnlock()
+	manager.subscribersMutex.RUnlock()
 }

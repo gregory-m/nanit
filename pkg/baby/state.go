@@ -2,12 +2,15 @@ package baby
 
 import (
 	reflect "reflect"
+
+	"github.com/rs/zerolog"
 )
 
 // State - struct holding information about state of a single baby
 type State struct {
-	TemperatureMilli *int32
-	HumidityMilli    *int32
+	LocalStreamingInitiated *bool
+	TemperatureMilli        *int32
+	HumidityMilli           *int32
 }
 
 // Merge - Merges non-nil values of an argument to the state.
@@ -44,7 +47,22 @@ func (state *State) Merge(stateUpdate *State) *State {
 	return state
 }
 
-// SetTemperatureMilli - mutates temperature field, returns itself
+// EnhanceLogEvent - appends non-nil properties to a log event
+func (state *State) EnhanceLogEvent(e *zerolog.Event) *zerolog.Event {
+	r := reflect.ValueOf(state).Elem()
+	t := r.Type()
+	for i := 0; i < r.NumField(); i++ {
+		f := r.Field(i)
+		if !f.IsNil() {
+
+			e.Interface(t.Field(i).Name, f.Interface())
+		}
+	}
+
+	return e
+}
+
+// SetTemperatureMilli - mutates field, returns itself
 func (state *State) SetTemperatureMilli(value int32) *State {
 	state.TemperatureMilli = &value
 	return state
@@ -59,7 +77,7 @@ func (state *State) GetTemperature() float32 {
 	return 0
 }
 
-// SetHumidityMilli - mutates humidity field, returns itself
+// SetHumidityMilli - mutates field, returns itself
 func (state *State) SetHumidityMilli(value int32) *State {
 	state.HumidityMilli = &value
 	return state
@@ -72,4 +90,19 @@ func (state *State) GetHumidity() float32 {
 	}
 
 	return 0
+}
+
+// SetLocalStreamingInitiated - mutates field, returns itself
+func (state *State) SetLocalStreamingInitiated(value bool) *State {
+	state.LocalStreamingInitiated = &value
+	return state
+}
+
+// GetLocalStreamingInitiated - safely returns value
+func (state *State) GetLocalStreamingInitiated() bool {
+	if state.LocalStreamingInitiated != nil {
+		return *state.LocalStreamingInitiated
+	}
+
+	return false
 }

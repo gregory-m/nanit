@@ -20,20 +20,33 @@ func processSensorData(babyUID string, sensorData []*client.SensorData, stateMan
 		}
 	}
 
-	if stateUpdate.HumidityMilli != nil || stateUpdate.TemperatureMilli != nil {
-		msg := log.Debug()
+	stateManager.Update(babyUID, stateUpdate)
+}
 
-		if stateUpdate.TemperatureMilli != nil {
-			msg.Float32("temperature", stateUpdate.GetTemperature())
-		}
+func requestLocalStreaming(babyUID string, targetURL string, conn *client.WebsocketConnection, stateManager *baby.StateManager) {
+	log.Info().Str("target", targetURL).Msg("Requesting local streaming")
 
-		if stateUpdate.HumidityMilli != nil {
-			msg.Float32("humidity", stateUpdate.GetHumidity())
-		}
+	awaitResponse := conn.SendRequest(client.RequestType_PUT_STREAMING, &client.Request{
+		Streaming: &client.Streaming{
+			Id:       client.StreamIdentifier(client.StreamIdentifier_MOBILE).Enum(),
+			RtmpUrl:  utils.ConstRefStr(targetURL),
+			Status:   client.Streaming_Status(client.Streaming_STARTED).Enum(),
+			Attempts: utils.ConstRefInt32(3),
+		},
+	})
 
-		msg.Msg("Received sensor data update")
-		stateManager.Update(babyUID, stateUpdate)
+	_, err := awaitResponse(30 * time.Second)
+
+	stateUpdate := baby.State{}
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to request local streaming")
+		stateUpdate.SetLocalStreamingInitiated(false)
+	} else {
+		log.Info().Msg("Local streaming successfully requested")
+		stateUpdate.SetLocalStreamingInitiated(true)
 	}
+
+	stateManager.Update(babyUID, stateUpdate)
 }
 
 func registerWebsocketHandlers(babyUID string, conn *client.WebsocketConnection, localStreamServer string, stateManager *baby.StateManager) {
@@ -49,25 +62,11 @@ func registerWebsocketHandlers(babyUID string, conn *client.WebsocketConnection,
 
 		// Push streaming URL
 		if localStreamServer != "" {
-			go func() {
-				log.Info().Str("target", localStreamServer).Msg("Requesting local streaming")
+			babyState := stateManager.GetBabyState(babyUID)
 
-				awaitResponse := conn.SendRequest(client.RequestType_PUT_STREAMING, &client.Request{
-					Streaming: &client.Streaming{
-						Id:       client.StreamIdentifier(client.StreamIdentifier_MOBILE).Enum(),
-						RtmpUrl:  utils.ConstRefStr(localStreamServer),
-						Status:   client.Streaming_Status(client.Streaming_STARTED).Enum(),
-						Attempts: utils.ConstRefInt32(3),
-					},
-				})
-
-				_, err := awaitResponse(30 * time.Second)
-				if err != nil {
-					log.Error().Err(err).Msg("Failed to request local streaming")
-				} else {
-					log.Info().Msg("Local streaming successfully requested")
-				}
-			}()
+			if !babyState.GetLocalStreamingInitiated() {
+				go requestLocalStreaming(babyUID, localStreamServer, conn, stateManager)
+			}
 		}
 
 		// Ask for logs
