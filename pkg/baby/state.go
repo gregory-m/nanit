@@ -32,14 +32,15 @@ func (state *State) Merge(stateUpdate *State) *State {
 		newField := newReflect.Field(i)
 		patchField := patchReflect.Field(i)
 
-		patchFieldValue := reflect.Value(patchField)
-		if patchFieldValue.IsNil() {
-			// FIXME: copy values not just pointers
-			newField.Set(reflect.Value(currField))
-		} else {
-			changed = true
-			// FIXME: copy values not just pointers
-			newField.Set(patchFieldValue)
+		if currField.Type().Kind() == reflect.Ptr {
+			if !patchField.IsNil() && (currField.IsNil() || currField.Elem().Interface() != patchField.Elem().Interface()) {
+				changed = true
+				ptr := reflect.New(patchField.Type().Elem())
+				ptr.Elem().Set(patchField.Elem())
+				newField.Set(ptr)
+			} else {
+				newField.Set(currField)
+			}
 		}
 	}
 
@@ -69,7 +70,7 @@ func (state *State) AsMap() map[string]interface{} {
 
 				if strings.HasSuffix(name, "Milli") {
 					name = strings.TrimSuffix(name, "Milli")
-					value = float32(value.(int64)) / 1000
+					value = float64(value.(int64)) / 1000
 				}
 			} else {
 				value = f.Elem().Interface()
@@ -103,9 +104,9 @@ func (state *State) SetTemperatureMilli(value int32) *State {
 }
 
 // GetTemperature - returns temperature as floating point
-func (state *State) GetTemperature() float32 {
+func (state *State) GetTemperature() float64 {
 	if state.TemperatureMilli != nil {
-		return float32(*state.TemperatureMilli) / 1000
+		return float64(*state.TemperatureMilli) / 1000
 	}
 
 	return 0
@@ -118,9 +119,9 @@ func (state *State) SetHumidityMilli(value int32) *State {
 }
 
 // GetHumidity - returns humidity as floating point
-func (state *State) GetHumidity() float32 {
+func (state *State) GetHumidity() float64 {
 	if state.HumidityMilli != nil {
-		return float32(*state.HumidityMilli) / 1000
+		return float64(*state.HumidityMilli) / 1000
 	}
 
 	return 0
