@@ -56,6 +56,11 @@ func (app *App) Run(ctx utils.GracefulContext) {
 	// Fetches babies info if they are not present in session
 	app.RestClient.EnsureBabies()
 
+	// Watchdog
+	if app.Opts.LocalStreaming != nil {
+		app.startWatchDog(ctx)
+	}
+
 	// MQTT
 	if app.MQTTConnection != nil {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
@@ -83,9 +88,12 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 	if app.Opts.StreamProcessor != nil {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
-				app.runStreamProcess(baby, attempt)
+				// Reauthorize if it is not a first try or we assume we don't have a valid token
+				app.RestClient.MaybeAuthorize(attempt.GetTry() > 1)
+
+				app.runStreamProcess(baby.UID, "hls-capture", app.Opts.StreamProcessor.CommandTemplate, attempt)
 			}, childCtx, utils.PerseverenceOpts{
-				RunnerID:       fmt.Sprintf("stream-processor-%v", baby.UID),
+				RunnerID:       fmt.Sprintf("hls-capture-%v", baby.UID),
 				ResetThreshold: 2 * time.Second,
 				Cooldown: []time.Duration{
 					2 * time.Second,
@@ -104,7 +112,7 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 		ws := client.NewWebsocketConnectionManager(baby.CameraUID, app.SessionStore.Session, app.RestClient)
 
 		ws.WithReadyConnection(func(conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
-			app.runWebsocket(baby, conn, childCtx)
+			app.runWebsocket(baby.UID, conn, childCtx)
 		})
 
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
@@ -115,24 +123,22 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 	<-ctx.Done()
 }
 
-func (app *App) runStreamProcess(baby baby.Baby, attempt utils.AttemptContext) {
-	// Reauthorize if it is not a first try or we assume we don't have a valid token
-	app.RestClient.MaybeAuthorize(attempt.GetTry() > 1)
+func (app *App) runStreamProcess(babyUID string, name string, commandTemplate string, attempt utils.GracefulContext) {
+	sublog := log.With().Str("processor", name).Logger()
 
-	logFilename := filepath.Join(app.Opts.DataDirectories.LogDir, fmt.Sprintf("process-%v-%v.log", baby.UID, time.Now().Format(time.RFC3339)))
-	url := fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", baby.UID, app.SessionStore.Session.AuthToken)
+	logFilename := filepath.Join(app.Opts.DataDirectories.LogDir, fmt.Sprintf("%v-%v-%v.log", name, babyUID, time.Now().Format(time.RFC3339)))
 
-	r := strings.NewReplacer("{sourceUrl}", url, "{babyUid}", baby.UID)
-	cmdTokens := strings.Split(r.Replace(app.Opts.StreamProcessor.CommandTemplate), " ")
+	r := strings.NewReplacer("{remoteStreamUrl}", app.getRemoteStreamURL(babyUID), "{localStreamUrl}", app.getLocalStreamURL(babyUID), "{babyUid}", babyUID)
+	cmdTokens := strings.Split(r.Replace(commandTemplate), " ")
 
 	logFile, fileErr := os.Create(logFilename)
 	if fileErr != nil {
-		log.Fatal().Str("filename", logFilename).Err(fileErr).Msg("Unable to create log file")
+		sublog.Fatal().Str("filename", logFilename).Err(fileErr).Msg("Unable to create log file")
 	}
 
 	defer logFile.Close()
 
-	log.Info().Str("cmd", strings.Join(cmdTokens, " ")).Str("logfile", logFilename).Msg("Starting stream processor")
+	sublog.Info().Str("cmd", strings.Join(cmdTokens, " ")).Str("logfile", logFilename).Msg("Starting stream processor")
 
 	cmd := exec.Command(cmdTokens[0], cmdTokens[1:]...)
 	cmd.Stderr = logFile
@@ -141,7 +147,7 @@ func (app *App) runStreamProcess(baby baby.Baby, attempt utils.AttemptContext) {
 
 	err := cmd.Start()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Unable to start stream processor")
+		sublog.Fatal().Err(err).Msg("Unable to start stream processor")
 	}
 
 	done := make(chan error, 1)
@@ -153,30 +159,30 @@ func (app *App) runStreamProcess(baby baby.Baby, attempt utils.AttemptContext) {
 	select {
 	case err := <-done:
 		if err != nil {
-			log.Error().Err(err).Msg("Stream processor exited")
+			sublog.Error().Err(err).Msg("Stream processor exited")
 			attempt.Fail(err)
 			return
 		}
 
-		log.Warn().Msg("Stream processor exited with status 0")
+		sublog.Warn().Msg("Stream processor exited with status 0")
 		attempt.Fail(errors.New("Stream processor exited with status 0"))
 		return
 
 	case <-attempt.Done():
-		log.Info().Msg("Terminating stream processor")
+		sublog.Info().Msg("Terminating stream processor")
 		if err := cmd.Process.Kill(); err != nil {
-			log.Error().Err(err).Msg("Unable to kill process")
+			sublog.Error().Err(err).Msg("Unable to kill process")
 		}
 	}
 }
 
-func (app *App) runWebsocket(baby baby.Baby, conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
+func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
 	// Reading sensor data
 	conn.RegisterMessageHandler(func(m *client.Message, conn *client.WebsocketConnection) {
 		// Sensor request initiated by us on start (or some other client, we don't care)
 		if *m.Type == client.Message_RESPONSE && m.Response != nil {
 			if *m.Response.RequestType == client.RequestType_GET_SENSOR_DATA && len(m.Response.SensorData) > 0 {
-				processSensorData(baby.UID, m.Response.SensorData, app.BabyStateManager)
+				processSensorData(babyUID, m.Response.SensorData, app.BabyStateManager)
 			}
 		} else
 
@@ -184,7 +190,7 @@ func (app *App) runWebsocket(baby baby.Baby, conn *client.WebsocketConnection, c
 		// Note: it sends the updates periodically on its own + whenever some significant change occurs
 		if *m.Type == client.Message_REQUEST && m.Request != nil {
 			if *m.Request.Type == client.RequestType_PUT_SENSOR_DATA && len(m.Request.SensorData_) > 0 {
-				processSensorData(baby.UID, m.Request.SensorData_, app.BabyStateManager)
+				processSensorData(babyUID, m.Request.SensorData_, app.BabyStateManager)
 			}
 		}
 	})
@@ -203,16 +209,64 @@ func (app *App) runWebsocket(baby baby.Baby, conn *client.WebsocketConnection, c
 	// 	},
 	// })
 
-	// Local stream
+	initializeLocalStreaming := func() {
+		requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), conn, app.BabyStateManager)
+	}
+
+	// Watch for local streaming state change
+	unsubscribe := app.BabyStateManager.Subscribe(func(updatedBabyUID string, stateUpdate baby.State) {
+		if updatedBabyUID == babyUID && stateUpdate.LocalStreamingInitiated != nil && *stateUpdate.LocalStreamingInitiated == false {
+			time.Sleep(1 * time.Second)
+			go initializeLocalStreaming()
+		}
+	})
+
+	// Initialize local streaming
 	if app.Opts.LocalStreaming != nil {
-		babyState := app.BabyStateManager.GetBabyState(baby.UID)
+		babyState := app.BabyStateManager.GetBabyState(babyUID)
 
 		if !babyState.GetLocalStreamingInitiated() {
-			r := strings.NewReplacer("{babyUid}", baby.UID)
-			localStreamURL := r.Replace(app.Opts.LocalStreaming.PushTargetURLTemplate)
-			go requestLocalStreaming(baby.UID, localStreamURL, conn, app.BabyStateManager)
+			go initializeLocalStreaming()
 		}
 	}
 
 	<-childCtx.Done()
+	unsubscribe()
+}
+
+func (app *App) startWatchDog(ctx utils.GracefulContext) {
+	app.BabyStateManager.Subscribe(func(babyUID string, stateUpdate baby.State) {
+		// If local streaming has been just initiated
+		if stateUpdate.LocalStreamingInitiated != nil && *stateUpdate.LocalStreamingInitiated == true {
+			ctx.RunAsChild(func(childCtx utils.GracefulContext) {
+				// Give a chance to stream to properly initiate
+				select {
+				case <-time.After(5 * time.Second):
+				case <-childCtx.Done():
+					return
+				}
+
+				log.Info().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
+				app.runStreamProcess(babyUID, "watchdog", "ffmpeg -i {localStreamUrl} -f null -", childCtx)
+			}).Wait()
+
+			log.Warn().Str("baby_uid", babyUID).Msg("Watchdog exited")
+			streamingStoppedUpdate := baby.State{}
+			streamingStoppedUpdate.SetLocalStreamingInitiated(false)
+			app.BabyStateManager.Update(babyUID, streamingStoppedUpdate)
+		}
+	})
+}
+
+func (app *App) getRemoteStreamURL(babyUID string) string {
+	return fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", babyUID, app.SessionStore.Session.AuthToken)
+}
+
+func (app *App) getLocalStreamURL(babyUID string) string {
+	if app.Opts.LocalStreaming != nil {
+		tpl := app.Opts.LocalStreaming.PushTargetURLTemplate
+		return strings.NewReplacer("{babyUid}", babyUID).Replace(tpl)
+	}
+
+	return ""
 }

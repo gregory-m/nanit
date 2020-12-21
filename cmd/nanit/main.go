@@ -23,14 +23,15 @@ func main() {
 		},
 		SessionFile:     utils.EnvVarStr("NANIT_SESSION_FILE", ""),
 		DataDirectories: ensureDataDirectories(),
-		HTTPEnabled:     utils.EnvVarBool("NANIT_HTTP_ENABLED", true),
+		HTTPEnabled:     false,
 	}
 
-	if utils.EnvVarBool("NANIT_REMOTE_STREAM_ENABLED", true) {
+	if utils.EnvVarBool("NANIT_HLS_ENABLED", true) {
+		opts.HTTPEnabled = true
 		opts.StreamProcessor = &app.StreamProcessorOpts{
 			CommandTemplate: utils.EnvVarStr(
-				"NANIT_REMOTE_STREAM_CMD",
-				"ffmpeg -i {sourceUrl} -codec copy -hls_time 1 -hls_wrap 10 -hls_flags delete_segments -hls_segment_filename {babyUid}-%02d.ts {babyUid}.m3u8",
+				"NANIT_HLS_CMD",
+				"ffmpeg -i {remoteStreamUrl} -codec copy -hls_time 1 -hls_wrap 10 -hls_flags delete_segments -hls_segment_filename {babyUid}-%02d.ts {babyUid}.m3u8",
 			),
 		}
 	}
