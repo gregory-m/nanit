@@ -27,21 +27,19 @@ func NewConnection(opts Opts) *Connection {
 func (conn *Connection) Run(manager *baby.StateManager, ctx utils.GracefulContext) {
 	conn.StateManager = manager
 
-	utils.AttempterRunWithinContext(
-		func(attempt *utils.Attempt) error {
-			return runMqtt(conn, attempt)
-		},
-		[]time.Duration{
+	utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
+		runMqtt(conn, attempt)
+	}, ctx, utils.PerseverenceOpts{
+		ResetThreshold: 2 * time.Second,
+		Cooldown: []time.Duration{
 			2 * time.Second,
 			10 * time.Second,
 			1 * time.Minute,
 		},
-		2*time.Second,
-		ctx,
-	)
+	})
 }
 
-func runMqtt(conn *Connection, attempt *utils.Attempt) error {
+func runMqtt(conn *Connection, attempt utils.AttemptContext) {
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker(conn.Opts.BrokerURL)
 	opts.SetClientID(conn.Opts.TopicPrefix)
@@ -52,7 +50,8 @@ func runMqtt(conn *Connection, attempt *utils.Attempt) error {
 	client := MQTT.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.Error().Str("broker_url", conn.Opts.BrokerURL).Err(token.Error()).Msg("Unable to connect to MQTT broker")
-		return token.Error()
+		attempt.Fail(token.Error())
+		return
 	}
 
 	log.Info().Str("broker_url", conn.Opts.BrokerURL).Msg("Successfully connected to MQTT broker")
@@ -75,5 +74,4 @@ func runMqtt(conn *Connection, attempt *utils.Attempt) error {
 	log.Debug().Msg("Closing MQTT connection on interrupt")
 	unsubscribe()
 	client.Disconnect(250)
-	return nil
 }

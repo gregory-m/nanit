@@ -82,20 +82,18 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 	// Remote stream processing
 	if app.Opts.StreamProcessor != nil {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
-			utils.AttempterRunWithinContext(
-				func(attempt *utils.Attempt) error {
-					return app.runStreamProcess(baby, attempt)
-				},
-				[]time.Duration{
+			utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
+				app.runStreamProcess(baby, attempt)
+			}, childCtx, utils.PerseverenceOpts{
+				ResetThreshold: 2 * time.Second,
+				Cooldown: []time.Duration{
 					2 * time.Second,
 					30 * time.Second,
 					2 * time.Minute,
 					15 * time.Minute,
 					1 * time.Hour,
 				},
-				2*time.Second,
-				ctx,
-			)
+			})
 		})
 	}
 
@@ -119,9 +117,9 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 	<-ctx.Done()
 }
 
-func (app *App) runStreamProcess(baby baby.Baby, attempt *utils.Attempt) error {
+func (app *App) runStreamProcess(baby baby.Baby, attempt utils.AttemptContext) {
 	// Reauthorize if it is not a first try or we assume we don't have a valid token
-	app.RestClient.MaybeAuthorize(attempt.Number > 1)
+	app.RestClient.MaybeAuthorize(attempt.GetTry() > 1)
 
 	logFilename := filepath.Join(app.Opts.DataDirectories.LogDir, fmt.Sprintf("process-%v-%v.log", baby.UID, time.Now().Format(time.RFC3339)))
 	url := fmt.Sprintf("rtmps://media-secured.nanit.com/nanit/%v.%v", baby.UID, app.SessionStore.Session.AuthToken)
@@ -154,24 +152,22 @@ func (app *App) runStreamProcess(baby baby.Baby, attempt *utils.Attempt) error {
 		done <- cmd.Wait()
 	}()
 
-	for {
-		select {
-		case err := <-done:
-			if err != nil {
-				log.Error().Err(err).Msg("Stream processor exited")
-				return err
-			}
+	select {
+	case err := <-done:
+		if err != nil {
+			log.Error().Err(err).Msg("Stream processor exited")
+			attempt.Fail(err)
+			return
+		}
 
-			log.Warn().Msg("Stream processor exited with status 0")
-			return errors.New("Stream processor exited with status 0")
+		log.Warn().Msg("Stream processor exited with status 0")
+		attempt.Fail(errors.New("Stream processor exited with status 0"))
+		return
 
-		case <-attempt.Done():
-			log.Info().Msg("Terminating stream processor")
-			if err := cmd.Process.Kill(); err != nil {
-				log.Error().Err(err).Msg("Unable to kill process")
-			}
-
-			return nil
+	case <-attempt.Done():
+		log.Info().Msg("Terminating stream processor")
+		if err := cmd.Process.Kill(); err != nil {
+			log.Error().Err(err).Msg("Unable to kill process")
 		}
 	}
 }

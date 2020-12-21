@@ -26,7 +26,6 @@ type WebsocketConnection struct {
 	Session       *session.Session
 	API           *NanitClient
 	Socket        gowebsocket.Socket
-	Attempter     *utils.Attempter
 	LastRequestID int32
 
 	UnhandledRequests     map[int32]unhandledRequest
@@ -61,20 +60,18 @@ func NewWebsocketConnection(cameraUID string, session *session.Session, api *Nan
 
 // RunWithinContext - starts websocket connection attempt loop
 func (conn *WebsocketConnection) RunWithinContext(ctx utils.GracefulContext) {
-	utils.AttempterRunWithinContext(
-		func(attempt *utils.Attempt) error {
-			return runWebsocket(conn, attempt)
-		},
-		[]time.Duration{
+	utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
+		conn.run(attempt)
+	}, ctx, utils.PerseverenceOpts{
+		ResetThreshold: 2 * time.Second,
+		Cooldown: []time.Duration{
 			// 2 * time.Second,
 			30 * time.Second,
 			2 * time.Minute,
 			15 * time.Minute,
 			1 * time.Hour,
 		},
-		2*time.Second,
-		ctx,
-	)
+	})
 }
 
 // OnReady - registers handler which will be called upon successfully established connection
@@ -188,9 +185,9 @@ func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData *R
 	}
 }
 
-func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
+func (conn *WebsocketConnection) run(attempt utils.AttemptContext) {
 	// Reauthorize if it is not a first try or we assume we don't have a valid token
-	conn.API.MaybeAuthorize(attempt.Number > 1)
+	conn.API.MaybeAuthorize(attempt.GetTry() > 1)
 
 	// Remote
 	url := fmt.Sprintf("wss://api.nanit.com/focus/cameras/%v/user_connect", conn.CameraUID)
@@ -202,7 +199,6 @@ func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
 
 	// -------
 
-	terminationC := make(chan error, 1)
 	var once sync.Once // Just because gowebsocket is buggy and can invoke OnDisconnect multiple times :-/
 
 	conn.Socket = gowebsocket.New(url)
@@ -219,8 +215,7 @@ func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
 	// Handle failed attempts for connection
 	conn.Socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
 		log.Error().Str("url", url).Err(err).Msg("Unable to establish websocket connection")
-		once.Do(func() { terminationC <- err })
-		close(terminationC)
+		attempt.Fail(err)
 	}
 
 	// Handle lost connection
@@ -228,10 +223,10 @@ func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
 		once.Do(func() {
 			if err != nil {
 				log.Error().Err(err).Msg("Disconnected from server")
-				terminationC <- err
+				attempt.Fail(err)
 			} else {
 				log.Warn().Msg("Disconnected from server")
-				terminationC <- nil
+				attempt.Fail(nil)
 			}
 		})
 	}
@@ -254,21 +249,15 @@ func runWebsocket(conn *WebsocketConnection, attempt *utils.Attempt) error {
 	log.Trace().Msg("Connecting to websocket")
 	conn.Socket.Connect()
 
-	for {
-		select {
-		case err := <-terminationC:
-			if conn.HandleTermination != nil {
-				conn.HandleTermination()
-			}
-			return err
-		case <-attempt.Done():
-			log.Debug().Msg("Closing websocket on interrupt")
-			if conn.HandleTermination != nil {
-				conn.HandleTermination()
-			}
-			conn.Socket.Close()
-			return nil
-		}
+	<-attempt.Done()
+
+	if conn.HandleTermination != nil {
+		conn.HandleTermination()
+	}
+
+	if conn.Socket.IsConnected {
+		log.Debug().Msg("Closing websocket")
+		conn.Socket.Close()
 	}
 }
 

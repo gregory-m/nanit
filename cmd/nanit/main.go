@@ -60,5 +60,19 @@ func main() {
 
 	<-interrupt
 	log.Warn().Msg("Received interrupt signal, terminating")
-	runner.Cancel()
+
+	waitForCleanup := make(chan struct{}, 1)
+
+	go func() {
+		runner.Cancel()
+		close(waitForCleanup)
+	}()
+
+	select {
+	case <-interrupt:
+		log.Fatal().Msg("Received another interrupt signal, forcing termination without clean up")
+	case <-waitForCleanup:
+		log.Info().Msg("Clean exit")
+		return
+	}
 }

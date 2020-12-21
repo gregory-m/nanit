@@ -11,7 +11,7 @@ type GracefulContext interface {
 	Done() <-chan struct{}
 
 	// RunAsChild - runs handler within child context
-	RunAsChild(callback func(GracefulContext))
+	RunAsChild(callback func(GracefulContext)) GracefulRunner
 
 	// Fail - cancels run from the inside and propagates cancel to all children
 	// Does not await the cancellation (obviously)
@@ -80,17 +80,36 @@ func (c *gracefulCtx) Done() <-chan struct{} {
 	return c.cancelC
 }
 
-func (c *gracefulCtx) RunAsChild(callback func(GracefulContext)) {
+func (c *gracefulCtx) RunAsChild(callback func(GracefulContext)) GracefulRunner {
+	// Parent should wait for 1 more child
 	c.wg.Add(1)
+
+	// Create channel for cancel callback
+	// Note: this is necessary so that we don't leak if child finishes first
+	cancelC := make(chan struct{}, 1)
+
+	// Start child runner
 	runner := RunWithGracefulCancel(func(childCtx GracefulContext) {
 		callback(childCtx)
+
+		// Notify parent that child is done
 		c.wg.Done()
+
+		// Unblock cancell callback
+		close(cancelC)
 	})
 
+	// Cancel child when parent gets cancelled
 	go func() {
-		<-c.Done()
-		runner.Cancel()
+		select {
+		case <-c.Done():
+			runner.Cancel()
+		case <-cancelC:
+			return
+		}
 	}()
+
+	return runner
 }
 
 func (c *gracefulCtx) Fail(err error) {
