@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 	sync "sync"
 	"time"
@@ -141,7 +142,7 @@ func (manager *WebsocketConnectionManager) run(attempt utils.AttemptContext) {
 				attempt.Fail(err)
 			} else {
 				log.Warn().Msg("Disconnected from server")
-				attempt.Fail(nil)
+				attempt.Fail(errors.New("Server closed the connection"))
 			}
 		})
 	}
