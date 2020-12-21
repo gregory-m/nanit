@@ -21,7 +21,7 @@ type GracefulContext interface {
 // GracefulRunner - outter API for controlling gracefully run handlers
 type GracefulRunner interface {
 	// Wait - blocks until finishes execution
-	Wait() error
+	Wait() (bool, error)
 
 	// Cancel - notifies handler to cancel the execution and awaits graceful return (clean up)
 	Cancel()
@@ -53,13 +53,13 @@ func newGracefulRunner(ctx *gracefulCtx) *gracefulRunner {
 	return &gracefulRunner{ctx}
 }
 
-func (runner *gracefulRunner) Wait() error {
+func (runner *gracefulRunner) Wait() (bool, error) {
 	runner.ctx.wg.Wait()
-	return runner.ctx.err
+	return runner.ctx.err == errCancel, runner.ctx.err
 }
 
 func (runner *gracefulRunner) Cancel() {
-	runner.ctx.Fail(errors.New("cancelled execution"))
+	runner.ctx.Fail(errCancel)
 	runner.ctx.wg.Wait()
 }
 
@@ -146,8 +146,10 @@ func newCancelledGracefulRunner() *cancelledGracefulRunner {
 	return &cancelledGracefulRunner{}
 }
 
-func (*cancelledGracefulRunner) Wait() error {
-	return errors.New("cancelled execution")
+func (*cancelledGracefulRunner) Wait() (bool, error) {
+	return true, errCancel
 }
 
 func (*cancelledGracefulRunner) Cancel() {}
+
+var errCancel error = errors.New("cancelled execution")

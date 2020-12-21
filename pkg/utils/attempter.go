@@ -40,31 +40,48 @@ func RunWithPerseverance(handler func(AttemptContext), ctx GracefulContext, opts
 		runnerID = opts.RunnerID
 	}
 
+	sublog := log.With().Str("runner", runnerID).Logger()
+
 	for {
 		select {
 		case <-ctx.Done():
-			log.Trace().Str("runner", runnerID).Msg("Perseverance run cancelled, there will be no further attempts")
+			sublog.Trace().Msg("Perseverance run cancelled, there will be no further attempts")
 			timer.Stop()
 			return
 		case timeScheduled := <-timer.C:
-			err := ctx.RunAsChild(func(childGracefulCtx GracefulContext) {
+			hasBeenCancelled, err := ctx.RunAsChild(func(childGracefulCtx GracefulContext) {
+				sublog.Trace().Int("try", try).Msg("Starting attempt")
 				handler(newAttemptCtx(try, childGracefulCtx))
 			}).Wait()
+
+			if hasBeenCancelled {
+				sublog.Trace().Msg("Perseverance run cancelled in the middle of execution, there will be no further attempts")
+				timer.Stop()
+				return
+			}
 
 			timeTaken := time.Since(timeScheduled)
 
 			if err == nil {
+				sublog.Trace().Msg("Attempt finished without an error")
 				return
-			} else if opts.ResetThreshold > 0 && timeTaken > opts.ResetThreshold {
-				log.Trace().Str("runner", runnerID).Msgf("Previous attempt was %v ago, resetting tries", timeTaken)
+			}
+
+			sublog.Trace().Err(err).Msg("Attempt finished with error")
+
+			if opts.ResetThreshold > 0 && timeTaken > opts.ResetThreshold {
+				sublog.Trace().Msgf("Previous attempt was %v ago, resetting tries", timeTaken)
 				try = 1
 			} else {
 				cooldown := opts.Cooldown[MinInt(try, len(opts.Cooldown))-1]
 				try++
 
 				if cooldown > timeTaken {
-					timer.Reset(cooldown - timeTaken)
+					waitDur := cooldown - timeTaken
+					sublog.Trace().Str("cooldown", fmt.Sprintf("%v", cooldown)).Str("remaining", fmt.Sprintf("%v", waitDur)).Msg("Cooling down before the next attempt")
+					timer.Reset(waitDur)
 				} else {
+					sublog.Trace().Msg("No cooldown necessary, we can perform next attempt")
 					timer.Reset(0)
 				}
 			}

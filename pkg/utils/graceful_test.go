@@ -24,6 +24,7 @@ func TestGracefulRunner(t *testing.T) {
 		out = out + " main_finished"
 	})
 
+	time.Sleep(100 * time.Millisecond)
 	runner.Cancel()
 	out = out + " after_cancel"
 
@@ -42,7 +43,7 @@ func TestGracefulRunnerFinished(t *testing.T) {
 		out = out + " main_finished"
 	})
 
-	err := runner.Wait()
+	_, err := runner.Wait()
 	assert.NoError(t, err)
 	assert.Equal(t, " main_finished sub_finished", out)
 }
@@ -68,7 +69,7 @@ func TestGracefulRunnerFail(t *testing.T) {
 		}
 	})
 
-	err := runner.Wait()
+	_, err := runner.Wait()
 	assert.EqualError(t, err, "simulated failure")
 	assert.Equal(t, " main_finished sub_finished", out)
 }
