@@ -20,6 +20,10 @@ It is possible to connect to the websocket either through Nanit servers or local
 
 Mobile clients start sending keep-alive packets after 1s and then every 20s. I have not yet experienced connection close with this strategy.
 
+On Nanit servers there are 2 websocket endpoints, 1 for camera (`wss://api.nanit.com/focus/cameras/{camera_uid}/connect`)
+and 1 for users (`wss://api.nanit.com/focus/cameras/{camera_uid}/user_connect`). Both seem to bve using the same protobuf,
+but each is accepting different subset of requests.
+
 ## Authorization
 
 There seems to be quite mess in request authorization. Probably caused by API being backed by multiple microservices.
@@ -28,7 +32,7 @@ The `api.nanit.com` server expects `Authorization: {token}` header.
 
 The `api.nanit.com/focus/*` endpoints expects `Authorization: Bearer {token}`.
 
-The local websocket can be authorized using _User Camera_ token with `Authorization: token {uc_token}`. It can be retrieved from `api.nanit.com/focus/cameras/{camera_uid}/uc_token`. It has longer expiration date so I expect that mobile clients are periodically renewing it so that it is ready for the time they might be offline.
+The local websocket can be authorized using _User Camera_ token with `Authorization: token {uc_token}`. It can be retrieved from `api.nanit.com/focus/cameras/{camera_uid}/uc_token`. It has longer expiration date so I expect that mobile clients are periodically renewing it so that it is ready for the time they might be offline. The same is probably true for the 
 
 **Warning for local websocket connection:** There seem to be a limit of 2 active connections on the device. The authorization will fail with 403 if you exceed the limit.
 

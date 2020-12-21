@@ -3,7 +3,7 @@ package client;
 option go_package = "gitlab.com/adam.stanek/nanit/pkg/client";
 
 enum RequestType {
-  GET_STREAMING = 3;
+  GET_STREAMING = 3; // Not implemented on user endpoint
   PUT_STREAMING = 2;
   GET_SETTINGS = 4;
   PUT_SETTINGS = 5;
