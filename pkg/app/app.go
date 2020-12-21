@@ -202,6 +202,13 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 		},
 	})
 
+	// Ask for status
+	// conn.SendRequest(client.RequestType_GET_STATUS, &client.Request{
+	// 	GetStatus_: &client.GetStatus{
+	// 		All: utils.ConstRefBool(true),
+	// 	},
+	// })
+
 	// Ask for logs
 	// conn.SendRequest(client.RequestType_GET_LOGS, &client.Request{
 	// 	GetLogs: &client.GetLogs{

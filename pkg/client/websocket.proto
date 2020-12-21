@@ -220,6 +220,10 @@ message GetLogs {
   required string url = 1;
 }
 
+message GetStatus {
+  optional bool all = 1;
+}
+
 message Request {
   required int32 id = 1;
   required RequestType type = 2;
@@ -231,6 +235,7 @@ message Request {
   optional Control control = 15;
   optional Settings settings = 5;
   optional Status status = 7;
+  optional GetStatus getStatus = 8;
   optional Playback playback = 16;
   optional GetLogs getLogs = 18;
 }
@@ -240,7 +245,8 @@ message Response {
   required RequestType requestType = 2;
   required int32 statusCode = 3;
   optional string statusMessage = 4;
-
+  
+  optional Status status = 5;
   repeated SensorData sensorData = 9;
   optional Settings settings = 6;
 }
