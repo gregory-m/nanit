@@ -27,6 +27,24 @@ type GracefulRunner interface {
 	Cancel()
 }
 
+// RunWithGracefulCancel - runs callback as a go routine and returns cancel routine
+// This is inspired by context but with the key difference that the cancel function waits until
+// the handler finishes all the cleanup
+// @see https://blog.golang.org/context
+func RunWithGracefulCancel(callback func(GracefulContext)) GracefulRunner {
+	ctx := newGracefulCtx()
+	ctx.wg.Add(1)
+
+	go func() {
+		callback(ctx)
+		ctx.wg.Done()
+	}()
+
+	return newGracefulRunner(ctx)
+}
+
+// -----------------------------
+
 type gracefulRunner struct {
 	ctx *gracefulCtx
 }
@@ -45,21 +63,7 @@ func (runner *gracefulRunner) Cancel() {
 	runner.ctx.wg.Wait()
 }
 
-// RunWithGracefulCancel - runs callback as a go routine and returns cancel routine
-// This is inspired by context but with the key difference that the cancel function waits until
-// the handler finishes all the cleanup
-// @see https://blog.golang.org/context
-func RunWithGracefulCancel(callback func(GracefulContext)) GracefulRunner {
-	ctx := newGracefulCtx()
-	ctx.wg.Add(1)
-
-	go func() {
-		callback(ctx)
-		ctx.wg.Done()
-	}()
-
-	return newGracefulRunner(ctx)
-}
+// -----------------------------
 
 type gracefulCtx struct {
 	cancelC         chan struct{}
@@ -84,6 +88,15 @@ func (c *gracefulCtx) RunAsChild(callback func(GracefulContext)) GracefulRunner 
 	// Parent should wait for 1 more child
 	c.wg.Add(1)
 
+	// Do not even start if context has been already cancelled
+	c.mutex.Lock()
+	if c.hasBeenCanceled {
+		c.wg.Done()
+		c.mutex.Unlock()
+		return newCancelledGracefulRunner()
+	}
+	c.mutex.Unlock()
+
 	// Create channel for cancel callback
 	// Note: this is necessary so that we don't leak if child finishes first
 	cancelC := make(chan struct{}, 1)
@@ -95,7 +108,7 @@ func (c *gracefulCtx) RunAsChild(callback func(GracefulContext)) GracefulRunner 
 		// Notify parent that child is done
 		c.wg.Done()
 
-		// Unblock cancell callback
+		// Unblock cancel callback
 		close(cancelC)
 	})
 
@@ -124,3 +137,17 @@ func (c *gracefulCtx) Fail(err error) {
 	close(c.cancelC)
 	c.mutex.Unlock()
 }
+
+// -----------------------------
+
+type cancelledGracefulRunner struct{}
+
+func newCancelledGracefulRunner() *cancelledGracefulRunner {
+	return &cancelledGracefulRunner{}
+}
+
+func (*cancelledGracefulRunner) Wait() error {
+	return errors.New("cancelled execution")
+}
+
+func (*cancelledGracefulRunner) Cancel() {}
