@@ -1,13 +1,10 @@
 package client
 
 import (
-	"errors"
 	"fmt"
 	sync "sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sacOO7/gowebsocket"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
@@ -15,54 +12,69 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type unhandledRequest struct {
-	Request        *Request
-	HandleResponse func(response *Response)
+type readyState struct {
+	Context    utils.GracefulContext
+	Connection *WebsocketConnection
 }
 
-// WebsocketConnection - connection container
-type WebsocketConnection struct {
-	CameraUID     string
-	Session       *session.Session
-	API           *NanitClient
-	Socket        gowebsocket.Socket
-	LastRequestID int32
+// WebsocketConnectionHandler - handler of ready connection
+type WebsocketConnectionHandler func(*WebsocketConnection, utils.GracefulContext)
 
-	UnhandledRequests     map[int32]unhandledRequest
-	UnhandledRequestsLock sync.Mutex
+// WebsocketConnectionManager - connection manager
+type WebsocketConnectionManager struct {
+	CameraUID string
+	Session   *session.Session
+	API       *NanitClient
 
-	HandleReady       func(*WebsocketConnection)
-	HandleTermination func()
-	HandleMessage     func(*Message, *WebsocketConnection)
+	mu               sync.RWMutex
+	readyState       *readyState
+	readySubscribers []WebsocketConnectionHandler
 }
 
-// NewWebsocketConnection - constructor
-func NewWebsocketConnection(cameraUID string, session *session.Session, api *NanitClient) *WebsocketConnection {
-	return &WebsocketConnection{
-		CameraUID:         cameraUID,
-		Session:           session,
-		API:               api,
-		LastRequestID:     0,
-		UnhandledRequests: make(map[int32]unhandledRequest),
-		HandleMessage: func(m *Message, conn *WebsocketConnection) {
-			if *m.Type == Message_RESPONSE && m.Response != nil {
-				conn.UnhandledRequestsLock.Lock()
-				unhandled, ok := conn.UnhandledRequests[*m.Response.RequestId]
-				conn.UnhandledRequestsLock.Unlock()
+// NewWebsocketConnectionManager - constructor
+func NewWebsocketConnectionManager(cameraUID string, session *session.Session, api *NanitClient) *WebsocketConnectionManager {
+	manager := &WebsocketConnectionManager{
+		CameraUID: cameraUID,
+		Session:   session,
+		API:       api,
+	}
 
-				if ok && *m.Response.RequestType == *unhandled.Request.Type {
-					unhandled.HandleResponse(m.Response)
-				}
+	manager.WithReadyConnection(func(conn *WebsocketConnection, ctx utils.GracefulContext) {
+		ticker := time.NewTicker(20 * time.Second)
+
+		for {
+			select {
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			case <-ticker.C:
+				conn.SendMessage(&Message{
+					Type: Message_Type(Message_KEEPALIVE).Enum(),
+				})
 			}
-		},
+		}
+	})
+
+	return manager
+}
+
+// WithReadyConnection - registers handler which will be called as a go routine upon ready connection
+func (manager *WebsocketConnectionManager) WithReadyConnection(handler WebsocketConnectionHandler) {
+	manager.mu.Lock()
+	readyState := manager.readyState
+	manager.readySubscribers = append(manager.readySubscribers, handler)
+	manager.mu.Unlock()
+
+	if readyState != nil {
+		log.Debug().Msg("Immediatelly notifying ready handler")
+		notifyReadHandler(handler, *readyState)
 	}
 }
 
 // RunWithinContext - starts websocket connection attempt loop
-func (conn *WebsocketConnection) RunWithinContext(ctx utils.GracefulContext) {
-	utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
-		conn.run(attempt)
-	}, ctx, utils.PerseverenceOpts{
+func (manager *WebsocketConnectionManager) RunWithinContext(ctx utils.GracefulContext) {
+	utils.RunWithPerseverance(manager.run, ctx, utils.PerseverenceOpts{
+		RunnerID:       fmt.Sprintf("websocket-%v", manager.CameraUID),
 		ResetThreshold: 2 * time.Second,
 		Cooldown: []time.Duration{
 			// 2 * time.Second,
@@ -74,124 +86,13 @@ func (conn *WebsocketConnection) RunWithinContext(ctx utils.GracefulContext) {
 	})
 }
 
-// OnReady - registers handler which will be called upon successfully established connection
-func (conn *WebsocketConnection) OnReady(handler func(*WebsocketConnection)) {
-	prev := conn.HandleReady
-	if prev != nil {
-		conn.HandleReady = func(conn *WebsocketConnection) {
-			prev(conn)
-			handler(conn)
-		}
-	} else {
-		conn.HandleReady = handler
-	}
-}
-
-// OnTermination - registers handler which will be called whenever the connection gets terminated
-func (conn *WebsocketConnection) OnTermination(handler func()) {
-	prev := conn.HandleTermination
-	if prev != nil {
-		conn.HandleTermination = func() {
-			prev()
-			handler()
-		}
-	} else {
-		conn.HandleTermination = handler
-	}
-}
-
-// OnMessage - registers handler which will be called upon incoming message
-func (conn *WebsocketConnection) OnMessage(handler func(*Message, *WebsocketConnection)) {
-	prev := conn.HandleMessage
-	conn.HandleMessage = func(m *Message, conn *WebsocketConnection) {
-		prev(m, conn)
-		handler(m, conn)
-	}
-}
-
-// SendMessage - low-level helper for sending raw message
-// Note: Use SendRequest() for requests
-func (conn *WebsocketConnection) SendMessage(m *Message) {
-	var msg *zerolog.Event
-
-	if *m.Type == Message_KEEPALIVE {
-		msg = log.Trace()
-	} else {
-		msg = log.Debug()
-	}
-
-	msg.Stringer("data", m).Msg("Sending message")
-
-	bytes := getMessageBytes(m)
-	log.Trace().Bytes("rawdata", bytes).Msg("Sending data")
-
-	conn.Socket.SendBinary(bytes)
-}
-
-// SendRequest - sends request to the cam and returns await function. Await function waits for the response and returns it
-func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData *Request) func(time.Duration) (*Response, error) {
-	id := atomic.AddInt32(&conn.LastRequestID, 1)
-
-	requestData.Id = utils.ConstRefInt32(id)
-	requestData.Type = RequestType(reqType).Enum()
-
-	m := &Message{
-		Type:    Message_Type(Message_REQUEST).Enum(),
-		Request: requestData,
-	}
-
-	conn.SendMessage(m)
-
-	return func(timeout time.Duration) (*Response, error) {
-		resC := make(chan *Response, 1)
-
-		defer func() {
-			conn.UnhandledRequestsLock.Lock()
-			delete(conn.UnhandledRequests, id)
-			conn.UnhandledRequestsLock.Unlock()
-		}()
-
-		conn.UnhandledRequestsLock.Lock()
-		conn.UnhandledRequests[id] = unhandledRequest{
-			Request: m.Request,
-			HandleResponse: func(res *Response) {
-				resC <- res
-			},
-		}
-		conn.UnhandledRequestsLock.Unlock()
-
-		timer := time.NewTimer(timeout)
-
-		select {
-		case <-timer.C:
-			close(resC)
-			return nil, errors.New("Request timeout")
-		case res := <-resC:
-			timer.Stop()
-			close(resC)
-
-			if res.StatusCode == nil {
-				return res, errors.New("No status code received")
-			} else if *res.StatusCode != 200 {
-				if res.GetStatusMessage() != "" {
-					return res, errors.New(res.GetStatusMessage())
-				}
-
-				return res, fmt.Errorf("Unexpected status code %v", *res.StatusCode)
-			}
-
-			return res, nil
-		}
-	}
-}
-
-func (conn *WebsocketConnection) run(attempt utils.AttemptContext) {
+func (manager *WebsocketConnectionManager) run(attempt utils.AttemptContext) {
 	// Reauthorize if it is not a first try or we assume we don't have a valid token
-	conn.API.MaybeAuthorize(attempt.GetTry() > 1)
+	manager.API.MaybeAuthorize(attempt.GetTry() > 1)
 
 	// Remote
-	url := fmt.Sprintf("wss://api.nanit.com/focus/cameras/%v/user_connect", conn.CameraUID)
-	auth := fmt.Sprintf("Bearer %v", conn.Session.AuthToken)
+	url := fmt.Sprintf("wss://api.nanit.com/focus/cameras/%v/user_connect", manager.CameraUID)
+	auth := fmt.Sprintf("Bearer %v", manager.Session.AuthToken)
 
 	// Local
 	// url := "wss://192.168.3.195:442"
@@ -201,25 +102,39 @@ func (conn *WebsocketConnection) run(attempt utils.AttemptContext) {
 
 	var once sync.Once // Just because gowebsocket is buggy and can invoke OnDisconnect multiple times :-/
 
-	conn.Socket = gowebsocket.New(url)
-	conn.Socket.RequestHeader.Set("Authorization", auth)
+	socket := gowebsocket.New(url)
+	socket.RequestHeader.Set("Authorization", auth)
 
 	// Handle new connection
-	conn.Socket.OnConnected = func(socket gowebsocket.Socket) {
+	socket.OnConnected = func(socket gowebsocket.Socket) {
 		log.Info().Str("url", url).Msg("Connected to websocket")
-		if conn.HandleReady != nil {
-			go conn.HandleReady(conn)
-		}
+
+		go func() {
+			conn := NewWebsocketConnection(&socket)
+			readyState := readyState{attempt, conn}
+
+			manager.mu.Lock()
+			manager.readyState = &readyState
+			subscribedHandlers := make([]WebsocketConnectionHandler, len(manager.readySubscribers))
+			copy(subscribedHandlers, manager.readySubscribers)
+			manager.mu.Unlock()
+
+			log.Debug().Int("num_handlers", len(subscribedHandlers)).Msg("Notifying websocket ready handlers")
+
+			for _, handler := range subscribedHandlers {
+				notifyReadHandler(handler, readyState)
+			}
+		}()
 	}
 
 	// Handle failed attempts for connection
-	conn.Socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
+	socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
 		log.Error().Str("url", url).Err(err).Msg("Unable to establish websocket connection")
 		attempt.Fail(err)
 	}
 
 	// Handle lost connection
-	conn.Socket.OnDisconnected = func(err error, socket gowebsocket.Socket) {
+	socket.OnDisconnected = func(err error, socket gowebsocket.Socket) {
 		once.Do(func() {
 			if err != nil {
 				log.Error().Err(err).Msg("Disconnected from server")
@@ -231,8 +146,7 @@ func (conn *WebsocketConnection) run(attempt utils.AttemptContext) {
 		})
 	}
 
-	// Handle messages
-	conn.Socket.OnBinaryMessage = func(data []byte, socket gowebsocket.Socket) {
+	socket.OnBinaryMessage = func(data []byte, _ gowebsocket.Socket) {
 		m := &Message{}
 		err := proto.Unmarshal(data, m)
 		if err != nil {
@@ -241,31 +155,27 @@ func (conn *WebsocketConnection) run(attempt utils.AttemptContext) {
 		}
 
 		log.Debug().Stringer("data", m).Msg("Received message")
-		if conn.HandleMessage != nil {
-			conn.HandleMessage(m, conn)
-		}
+
+		manager.mu.RLock()
+		readyState := manager.readyState
+		manager.mu.RUnlock()
+
+		go readyState.Connection.handleMessage(m)
 	}
 
 	log.Trace().Msg("Connecting to websocket")
-	conn.Socket.Connect()
+	socket.Connect()
 
 	<-attempt.Done()
 
-	if conn.HandleTermination != nil {
-		conn.HandleTermination()
-	}
-
-	if conn.Socket.IsConnected {
+	if socket.IsConnected {
 		log.Debug().Msg("Closing websocket")
-		conn.Socket.Close()
+		socket.Close()
 	}
 }
 
-func getMessageBytes(data *Message) []byte {
-	out, err := proto.Marshal(data)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Unable to marshal data")
-	}
-
-	return out
+func notifyReadHandler(handler WebsocketConnectionHandler, state readyState) {
+	state.Context.RunAsChild(func(childCtx utils.GracefulContext) {
+		handler(state.Connection, childCtx)
+	})
 }

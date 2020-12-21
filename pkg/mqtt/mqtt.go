@@ -30,6 +30,7 @@ func (conn *Connection) Run(manager *baby.StateManager, ctx utils.GracefulContex
 	utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
 		runMqtt(conn, attempt)
 	}, ctx, utils.PerseverenceOpts{
+		RunnerID:       "mqtt",
 		ResetThreshold: 2 * time.Second,
 		Cooldown: []time.Duration{
 			2 * time.Second,

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -22,16 +24,26 @@ type PerseverenceOpts struct {
 
 	// ResetThreshold - After this time failed attempts are counted as first failure
 	ResetThreshold time.Duration
+
+	// RunnerID - optional string name for the runner for debugging purposes
+	RunnerID string
 }
+
+var lastPerseveranceRunnerID int32 = 0
 
 // RunWithPerseverance - runs handler and tries it again if it fails
 func RunWithPerseverance(handler func(AttemptContext), ctx GracefulContext, opts PerseverenceOpts) {
 	try := 1
 	timer := time.NewTimer(0)
+	runnerID := fmt.Sprintf("runner%v", atomic.AddInt32(&lastPerseveranceRunnerID, 1))
+	if opts.RunnerID != "" {
+		runnerID = opts.RunnerID
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
+			log.Trace().Str("runner", runnerID).Msg("Perseverance run cancelled, there will be no further attempts")
 			timer.Stop()
 			return
 		case timeScheduled := <-timer.C:
@@ -44,7 +56,7 @@ func RunWithPerseverance(handler func(AttemptContext), ctx GracefulContext, opts
 			if err == nil {
 				return
 			} else if opts.ResetThreshold > 0 && timeTaken > opts.ResetThreshold {
-				log.Trace().Msgf("Previous attempt was %v ago, resetting tries", timeTaken)
+				log.Trace().Str("runner", runnerID).Msgf("Previous attempt was %v ago, resetting tries", timeTaken)
 				try = 1
 			} else {
 				cooldown := opts.Cooldown[MinInt(try, len(opts.Cooldown))-1]

@@ -85,6 +85,7 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 			utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
 				app.runStreamProcess(baby, attempt)
 			}, childCtx, utils.PerseverenceOpts{
+				RunnerID:       fmt.Sprintf("stream-processor-%v", baby.UID),
 				ResetThreshold: 2 * time.Second,
 				Cooldown: []time.Duration{
 					2 * time.Second,
@@ -97,18 +98,15 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 		})
 	}
 
-	// Local stream
-	localStreamURL := ""
-	if app.Opts.LocalStreaming != nil {
-		r := strings.NewReplacer("{babyUid}", baby.UID)
-		localStreamURL = r.Replace(app.Opts.LocalStreaming.PushTargetURLTemplate)
-	}
-
 	// Websocket connection
 	if app.Opts.LocalStreaming != nil || app.MQTTConnection != nil {
 		// Websocket connection
-		ws := client.NewWebsocketConnection(baby.CameraUID, app.SessionStore.Session, app.RestClient)
-		registerWebsocketHandlers(baby.UID, ws, localStreamURL, app.BabyStateManager)
+		ws := client.NewWebsocketConnectionManager(baby.CameraUID, app.SessionStore.Session, app.RestClient)
+
+		ws.WithReadyConnection(func(conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
+			app.runWebsocket(baby, conn, childCtx)
+		})
+
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			ws.RunWithinContext(childCtx)
 		})
@@ -170,4 +168,51 @@ func (app *App) runStreamProcess(baby baby.Baby, attempt utils.AttemptContext) {
 			log.Error().Err(err).Msg("Unable to kill process")
 		}
 	}
+}
+
+func (app *App) runWebsocket(baby baby.Baby, conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
+	// Reading sensor data
+	conn.RegisterMessageHandler(func(m *client.Message, conn *client.WebsocketConnection) {
+		// Sensor request initiated by us on start (or some other client, we don't care)
+		if *m.Type == client.Message_RESPONSE && m.Response != nil {
+			if *m.Response.RequestType == client.RequestType_GET_SENSOR_DATA && len(m.Response.SensorData) > 0 {
+				processSensorData(baby.UID, m.Response.SensorData, app.BabyStateManager)
+			}
+		} else
+
+		// Communication initiated from a cam
+		// Note: it sends the updates periodically on its own + whenever some significant change occurs
+		if *m.Type == client.Message_REQUEST && m.Request != nil {
+			if *m.Request.Type == client.RequestType_PUT_SENSOR_DATA && len(m.Request.SensorData_) > 0 {
+				processSensorData(baby.UID, m.Request.SensorData_, app.BabyStateManager)
+			}
+		}
+	})
+
+	// Ask for sensor data (initial request)
+	conn.SendRequest(client.RequestType_GET_SENSOR_DATA, &client.Request{
+		GetSensorData: &client.GetSensorData{
+			All: utils.ConstRefBool(true),
+		},
+	})
+
+	// Ask for logs
+	// conn.SendRequest(client.RequestType_GET_LOGS, &client.Request{
+	// 	GetLogs: &client.GetLogs{
+	// 		Url: utils.ConstRefStr("http://192.168.3.234:8080/log"),
+	// 	},
+	// })
+
+	// Local stream
+	if app.Opts.LocalStreaming != nil {
+		babyState := app.BabyStateManager.GetBabyState(baby.UID)
+
+		if !babyState.GetLocalStreamingInitiated() {
+			r := strings.NewReplacer("{babyUid}", baby.UID)
+			localStreamURL := r.Replace(app.Opts.LocalStreaming.PushTargetURLTemplate)
+			go requestLocalStreaming(baby.UID, localStreamURL, conn, app.BabyStateManager)
+		}
+	}
+
+	<-childCtx.Done()
 }
