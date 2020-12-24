@@ -260,14 +260,12 @@ func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
 				app.dummyPlayer(babyUID, ctx)
 
 				app.BabyStateManager.Update(babyUID, *baby.NewState().SetStreamState(baby.StreamState_Unhealthy))
-				if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
-					timer.Reset(5 * time.Second)
-				} else {
+				if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() == baby.StreamRequestState_RequestFailed {
 					log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
 				}
-			} else {
-				log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
 			}
+
+			timer.Reset(5 * time.Second)
 
 		case <-ctx.Done():
 			log.Debug().Str("baby_uid", babyUID).Msg("Terminating watchdog")
