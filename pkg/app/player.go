@@ -3,6 +3,7 @@ package app
 import (
 	"io"
 	"os/exec"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/tevino/abool"
@@ -28,6 +29,8 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 	if err != nil {
 		sublog.Fatal().Err(err).Msg("Failed to prepare stdout pipe")
 	}
+
+	timeout := time.NewTimer(10 * time.Second)
 
 	err = cmd.Start()
 	if err != nil {
@@ -74,6 +77,7 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 
 		sublog.Debug().Msg("Successfully decoded stream header")
 		sublog.Info().Str("url", url).Msg("Stream is alive")
+		timeout.Stop()
 
 		streamingStoppedUpdate := baby.State{}
 		streamingStoppedUpdate.SetIsStreamAlive(true)
@@ -101,6 +105,7 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 		select {
 		case <-exitedC:
 			exitingFlag.Set()
+			timeout.Stop()
 			exitCode := cmd.ProcessState.ExitCode()
 			if exitCode == -1 {
 				sublog.Warn().Msg("Player terminated")
@@ -111,14 +116,23 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 
 			return
 
+		case <-timeout.C:
+			if !exitingFlag.IsSet() {
+				exitingFlag.Set()
+				sublog.Debug().Msg("Stream timout, killing the player process")
+				cmd.Process.Kill()
+			}
+
 		case <-ctx.Done():
 			if !exitingFlag.IsSet() {
 				exitingFlag.Set()
 				sublog.Debug().Msg("Cancel request received, killing the process")
+				timeout.Stop()
 				cmd.Process.Kill()
 			}
 		case <-decoderC:
 			sublog.Debug().Msg("Decoder failure, killing the process")
+			timeout.Stop()
 			cmd.Process.Kill()
 		}
 	}
