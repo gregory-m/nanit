@@ -40,8 +40,17 @@ func requestLocalStreaming(babyUID string, targetURL string, conn *client.Websoc
 	_, err := awaitResponse(30 * time.Second)
 
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to request local streaming")
+		if stateManager.GetBabyState(babyUID).GetStreamState() == baby.StreamState_Alive {
+			log.Info().Err(err).Msg("Failed to request local streaming, but stream seems to be alive from previous run")
+		} else if stateManager.GetBabyState(babyUID).GetStreamState() == baby.StreamState_Unhealthy {
+			log.Error().Err(err).Msg("Failed to request local streaming and stream seems to be dead")
+			stateManager.Update(babyUID, *baby.NewState().SetStreamRequestState(baby.StreamRequestState_RequestFailed))
+		} else {
+			log.Warn().Err(err).Msg("Failed to request local streaming, awaiting stream health check")
+			stateManager.Update(babyUID, *baby.NewState().SetStreamRequestState(baby.StreamRequestState_RequestFailed))
+		}
 	} else {
 		log.Info().Msg("Local streaming successfully requested")
+		stateManager.Update(babyUID, *baby.NewState().SetStreamRequestState(baby.StreamRequestState_Requested))
 	}
 }

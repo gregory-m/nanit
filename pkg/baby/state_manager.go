@@ -24,21 +24,21 @@ func NewStateManager() *StateManager {
 
 // Update - updates baby info in thread safe manner
 func (manager *StateManager) Update(babyUID string, stateUpdate State) {
-	var newState *State
+	var updatedState *State
 
 	manager.stateMutex.Lock()
 	defer manager.stateMutex.Unlock()
 
 	if babyState, ok := manager.babiesByUID[babyUID]; ok {
-		newState = babyState.Merge(&stateUpdate)
-		if newState == &babyState {
+		updatedState = babyState.Merge(&stateUpdate)
+		if updatedState == &babyState {
 			return
 		}
 	} else {
-		newState = (&State{}).Merge(&stateUpdate)
+		updatedState = NewState().Merge(&stateUpdate)
 	}
 
-	manager.babiesByUID[babyUID] = *newState
+	manager.babiesByUID[babyUID] = *updatedState
 	stateUpdate.EnhanceLogEvent(log.Debug().Str("baby_uid", babyUID)).Msg("Baby state updated")
 
 	go manager.notifySubscribers(babyUID, stateUpdate)
@@ -68,12 +68,12 @@ func (manager *StateManager) Subscribe(callback func(babyUID string, state State
 }
 
 // GetBabyState - returns current state of a baby
-func (manager *StateManager) GetBabyState(babyUID string) State {
+func (manager *StateManager) GetBabyState(babyUID string) *State {
 	manager.stateMutex.RLock()
 	babyState := manager.babiesByUID[babyUID]
 	manager.stateMutex.RUnlock()
 
-	return babyState
+	return &babyState
 }
 
 func (manager *StateManager) notifySubscribers(babyUID string, state State) {

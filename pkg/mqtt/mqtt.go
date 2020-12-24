@@ -58,7 +58,7 @@ func runMqtt(conn *Connection, attempt utils.AttemptContext) {
 	log.Info().Str("broker_url", conn.Opts.BrokerURL).Msg("Successfully connected to MQTT broker")
 
 	unsubscribe := conn.StateManager.Subscribe(func(babyUID string, state baby.State) {
-		for key, value := range state.AsMap() {
+		for key, value := range state.AsMap(false) {
 			topic := fmt.Sprintf("%v/babies/%v/%v", conn.Opts.TopicPrefix, babyUID, key)
 			log.Trace().Str("topic", topic).Interface("value", value).Msg("MQTT publish")
 

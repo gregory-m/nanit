@@ -224,8 +224,12 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 
 	// Watch for stream liveness change
 	unsubscribe := app.BabyStateManager.Subscribe(func(updatedBabyUID string, stateUpdate baby.State) {
-		if updatedBabyUID == babyUID && stateUpdate.IsStreamAlive != nil && *stateUpdate.IsStreamAlive == false {
-			go initializeLocalStreaming()
+		// Do another streaming request if stream just turned unhealthy
+		if updatedBabyUID == babyUID && stateUpdate.StreamState != nil && *stateUpdate.StreamState == baby.StreamState_Unhealthy {
+			// Prevent duplicate request if we already received failure
+			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
+				go initializeLocalStreaming()
+			}
 		}
 	})
 
@@ -233,8 +237,10 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 	if app.Opts.LocalStreaming != nil {
 		babyState := app.BabyStateManager.GetBabyState(babyUID)
 
-		if babyState.IsStreamAlive != nil && *babyState.IsStreamAlive == false {
-			go initializeLocalStreaming()
+		if babyState.GetStreamState() != baby.StreamState_Alive {
+			if babyState.GetStreamRequestState() != baby.StreamRequestState_Requested || babyState.GetStreamState() == baby.StreamState_Unhealthy {
+				go initializeLocalStreaming()
+			}
 		}
 	}
 
@@ -248,14 +254,20 @@ func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
 	for {
 		select {
 		case <-timer.C:
-			log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
+			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
+				log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
 
-			app.dummyPlayer(babyUID, ctx)
+				app.dummyPlayer(babyUID, ctx)
 
-			streamingStoppedUpdate := baby.State{}
-			streamingStoppedUpdate.SetIsStreamAlive(false)
-			app.BabyStateManager.Update(babyUID, streamingStoppedUpdate)
-			timer.Reset(5 * time.Second)
+				app.BabyStateManager.Update(babyUID, *baby.NewState().SetStreamState(baby.StreamState_Unhealthy))
+				if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
+					timer.Reset(5 * time.Second)
+				} else {
+					log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
+				}
+			} else {
+				log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
+			}
 
 		case <-ctx.Done():
 			log.Debug().Str("baby_uid", babyUID).Msg("Terminating watchdog")

@@ -79,9 +79,12 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 		sublog.Info().Str("url", url).Msg("Stream is alive")
 		timeout.Stop()
 
-		streamingStoppedUpdate := baby.State{}
-		streamingStoppedUpdate.SetIsStreamAlive(true)
-		app.BabyStateManager.Update(babyUID, streamingStoppedUpdate)
+		app.BabyStateManager.Update(
+			babyUID,
+			*baby.NewState().
+				SetStreamRequestState(baby.StreamRequestState_Requested).
+				SetStreamState(baby.StreamState_Alive),
+		)
 
 		var flvTag flvtag.FlvTag
 		for {
@@ -108,10 +111,10 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 			timeout.Stop()
 			exitCode := cmd.ProcessState.ExitCode()
 			if exitCode == -1 {
-				sublog.Warn().Msg("Player terminated")
+				sublog.Debug().Msg("Player terminated")
 			} else {
 				tailer := <-stderrC
-				sublog.Error().Int("code", exitCode).Str("logtail", tailer.String()).Msg("Player exited")
+				sublog.Warn().Int("code", exitCode).Str("logtail", tailer.String()).Msg("Player process exited")
 			}
 
 			return
@@ -119,19 +122,19 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 		case <-timeout.C:
 			if !exitingFlag.IsSet() {
 				exitingFlag.Set()
-				sublog.Debug().Msg("Stream timout, killing the player process")
+				sublog.Warn().Msg("Stream timout, killing the player process")
 				cmd.Process.Kill()
 			}
 
 		case <-ctx.Done():
 			if !exitingFlag.IsSet() {
 				exitingFlag.Set()
-				sublog.Debug().Msg("Cancel request received, killing the process")
+				sublog.Debug().Msg("Cancel request received, killing the player process")
 				timeout.Stop()
 				cmd.Process.Kill()
 			}
 		case <-decoderC:
-			sublog.Debug().Msg("Decoder failure, killing the process")
+			sublog.Warn().Msg("Decoder failure, killing the player process")
 			timeout.Stop()
 			cmd.Process.Kill()
 		}

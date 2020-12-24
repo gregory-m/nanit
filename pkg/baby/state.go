@@ -8,12 +8,35 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type StreamRequestState int32
+
+const (
+	StreamRequestState_NotRequested StreamRequestState = iota
+	StreamRequestState_Requested
+	StreamRequestState_RequestFailed
+)
+
+type StreamState int32
+
+const (
+	StreamState_Unknown StreamState = iota
+	StreamState_Unhealthy
+	StreamState_Alive
+)
+
 // State - struct holding information about state of a single baby
 type State struct {
-	IsStreamAlive    *bool
+	StreamState        *StreamState        `internal:"true"`
+	StreamRequestState *StreamRequestState `internal:"true"`
+
 	IsNight          *bool
 	TemperatureMilli *int32
 	HumidityMilli    *int32
+}
+
+// NewState - constructor
+func NewState() *State {
+	return &State{}
 }
 
 // Merge - Merges non-nil values of an argument to the state.
@@ -54,34 +77,39 @@ func (state *State) Merge(stateUpdate *State) *State {
 var upperCaseRX = regexp.MustCompile("[A-Z]+")
 
 // AsMap - returns K/V map of non-nil properties
-func (state *State) AsMap() map[string]interface{} {
+func (state *State) AsMap(includeInternal bool) map[string]interface{} {
 	m := make(map[string]interface{})
 
 	r := reflect.ValueOf(state).Elem()
+	ts := reflect.TypeOf(*state)
 	t := r.Type()
 	for i := 0; i < r.NumField(); i++ {
 		f := r.Field(i)
-		if !f.IsNil() && f.Type().Kind() == reflect.Ptr {
-			name := t.Field(i).Name
-			var value interface{}
 
-			if f.Type().Elem().Kind() == reflect.Int32 {
-				value = f.Elem().Int()
+		if includeInternal || ts.Field(i).Tag.Get("internal") != "true" {
 
-				if strings.HasSuffix(name, "Milli") {
-					name = strings.TrimSuffix(name, "Milli")
-					value = float64(value.(int64)) / 1000
+			if !f.IsNil() && f.Type().Kind() == reflect.Ptr {
+				name := t.Field(i).Name
+				var value interface{}
+
+				if f.Type().Elem().Kind() == reflect.Int32 {
+					value = f.Elem().Int()
+
+					if strings.HasSuffix(name, "Milli") {
+						name = strings.TrimSuffix(name, "Milli")
+						value = float64(value.(int64)) / 1000
+					}
+				} else {
+					value = f.Elem().Interface()
 				}
-			} else {
-				value = f.Elem().Interface()
+
+				name = strings.ToLower(name[0:1]) + name[1:]
+				name = upperCaseRX.ReplaceAllStringFunc(name, func(m string) string {
+					return "_" + strings.ToLower(m)
+				})
+
+				m[name] = value
 			}
-
-			name = strings.ToLower(name[0:1]) + name[1:]
-			name = upperCaseRX.ReplaceAllStringFunc(name, func(m string) string {
-				return "_" + strings.ToLower(m)
-			})
-
-			m[name] = value
 		}
 	}
 
@@ -90,7 +118,7 @@ func (state *State) AsMap() map[string]interface{} {
 
 // EnhanceLogEvent - appends non-nil properties to a log event
 func (state *State) EnhanceLogEvent(e *zerolog.Event) *zerolog.Event {
-	for key, value := range state.AsMap() {
+	for key, value := range state.AsMap(true) {
 		e.Interface(key, value)
 	}
 
@@ -127,19 +155,34 @@ func (state *State) GetHumidity() float64 {
 	return 0
 }
 
-// SetIsStreamAlive - mutates field, returns itself
-func (state *State) SetIsStreamAlive(value bool) *State {
-	state.IsStreamAlive = &value
+// SetStreamRequestState - mutates field, returns itself
+func (state *State) SetStreamRequestState(value StreamRequestState) *State {
+	state.StreamRequestState = &value
 	return state
 }
 
-// GetIsStreamAlive - safely returns value
-func (state *State) GetIsStreamAlive() bool {
-	if state.IsStreamAlive != nil {
-		return *state.IsStreamAlive
+// GetStreamRequestState - safely returns value
+func (state *State) GetStreamRequestState() StreamRequestState {
+	if state.StreamRequestState != nil {
+		return *state.StreamRequestState
 	}
 
-	return false
+	return StreamRequestState_NotRequested
+}
+
+// SetStreamState - mutates field, returns itself
+func (state *State) SetStreamState(value StreamState) *State {
+	state.StreamState = &value
+	return state
+}
+
+// GetStreamState - safely returns value
+func (state *State) GetStreamState() StreamState {
+	if state.StreamState != nil {
+		return *state.StreamState
+	}
+
+	return StreamState_Unknown
 }
 
 // SetIsNight - mutates field, returns itself
