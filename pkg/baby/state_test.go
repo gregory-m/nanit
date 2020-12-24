@@ -32,12 +32,12 @@ func TestStateMergeSame(t *testing.T) {
 func TestStateMergeDifferent(t *testing.T) {
 	s1 := &baby.State{}
 	s1.SetTemperatureMilli(10_000)
-	s1.SetLocalStreamingInitiated(true)
+	s1.SetIsStreamAlive(true)
 
 	s2 := &baby.State{}
 	s2.SetTemperatureMilli(11_000)
 	s2.SetHumidityMilli(20_000)
-	s2.SetLocalStreamingInitiated(true)
+	s2.SetIsStreamAlive(true)
 
 	s3 := s1.Merge(s2)
 	assert.NotSame(t, s1, s3)
@@ -46,5 +46,5 @@ func TestStateMergeDifferent(t *testing.T) {
 
 	assert.Equal(t, 11.0, s3.GetTemperature())
 	assert.Equal(t, 20.0, s3.GetHumidity())
-	assert.Equal(t, true, s3.GetLocalStreamingInitiated())
+	assert.Equal(t, true, s3.GetIsStreamAlive())
 }

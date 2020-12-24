@@ -56,11 +56,6 @@ func (app *App) Run(ctx utils.GracefulContext) {
 	// Fetches babies info if they are not present in session
 	app.RestClient.EnsureBabies()
 
-	// Watchdog
-	if app.Opts.LocalStreaming != nil {
-		app.startWatchDog(ctx)
-	}
-
 	// MQTT
 	if app.MQTTConnection != nil {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
@@ -118,6 +113,13 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			ws.RunWithinContext(childCtx)
 		})
+
+		// Watchdog
+		if app.Opts.LocalStreaming != nil {
+			ctx.RunAsChild(func(childCtx utils.GracefulContext) {
+				app.runWatchDog(baby.UID, ctx)
+			})
+		}
 	}
 
 	<-ctx.Done()
@@ -220,19 +222,18 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 		requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), conn, app.BabyStateManager)
 	}
 
-	// Watch for local streaming state change
+	// Watch for stream liveness change
 	unsubscribe := app.BabyStateManager.Subscribe(func(updatedBabyUID string, stateUpdate baby.State) {
-		if updatedBabyUID == babyUID && stateUpdate.LocalStreamingInitiated != nil && *stateUpdate.LocalStreamingInitiated == false {
-			time.Sleep(1 * time.Second)
+		if updatedBabyUID == babyUID && stateUpdate.IsStreamAlive != nil && *stateUpdate.IsStreamAlive == false {
 			go initializeLocalStreaming()
 		}
 	})
 
-	// Initialize local streaming
+	// Initialize local streaming upon connection if we know that the stream is not alive
 	if app.Opts.LocalStreaming != nil {
 		babyState := app.BabyStateManager.GetBabyState(babyUID)
 
-		if !babyState.GetLocalStreamingInitiated() {
+		if babyState.IsStreamAlive != nil && *babyState.IsStreamAlive == false {
 			go initializeLocalStreaming()
 		}
 	}
@@ -241,28 +242,26 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 	unsubscribe()
 }
 
-func (app *App) startWatchDog(ctx utils.GracefulContext) {
-	app.BabyStateManager.Subscribe(func(babyUID string, stateUpdate baby.State) {
-		// If local streaming has been just initiated
-		if stateUpdate.LocalStreamingInitiated != nil && *stateUpdate.LocalStreamingInitiated == true {
-			ctx.RunAsChild(func(childCtx utils.GracefulContext) {
-				// Give a chance to stream to properly initiate
-				select {
-				case <-time.After(5 * time.Second):
-				case <-childCtx.Done():
-					return
-				}
+func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
+	timer := time.NewTimer(0)
 
-				log.Info().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
-				app.runStreamProcess(babyUID, "watchdog", "ffmpeg -i {localStreamUrl} -f null -", childCtx)
-			}).Wait()
+	for {
+		select {
+		case <-timer.C:
+			log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
 
-			log.Warn().Str("baby_uid", babyUID).Msg("Watchdog exited")
+			app.dummyPlayer(babyUID, ctx)
+
 			streamingStoppedUpdate := baby.State{}
-			streamingStoppedUpdate.SetLocalStreamingInitiated(false)
+			streamingStoppedUpdate.SetIsStreamAlive(false)
 			app.BabyStateManager.Update(babyUID, streamingStoppedUpdate)
+			timer.Reset(5 * time.Second)
+
+		case <-ctx.Done():
+			log.Debug().Str("baby_uid", babyUID).Msg("Terminating watchdog")
+			return
 		}
-	})
+	}
 }
 
 func (app *App) getRemoteStreamURL(babyUID string) string {

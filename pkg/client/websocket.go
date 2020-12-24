@@ -120,7 +120,7 @@ func (manager *WebsocketConnectionManager) run(attempt utils.AttemptContext) {
 			copy(subscribedHandlers, manager.readySubscribers)
 			manager.mu.Unlock()
 
-			log.Debug().Int("num_handlers", len(subscribedHandlers)).Msg("Notifying websocket ready handlers")
+			log.Trace().Int("num_handlers", len(subscribedHandlers)).Msg("Notifying websocket ready handlers")
 
 			for _, handler := range subscribedHandlers {
 				notifyReadHandler(handler, readyState)

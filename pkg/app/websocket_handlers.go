@@ -39,14 +39,9 @@ func requestLocalStreaming(babyUID string, targetURL string, conn *client.Websoc
 
 	_, err := awaitResponse(30 * time.Second)
 
-	stateUpdate := baby.State{}
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to request local streaming")
-		stateUpdate.SetLocalStreamingInitiated(false)
 	} else {
 		log.Info().Msg("Local streaming successfully requested")
-		stateUpdate.SetLocalStreamingInitiated(true)
 	}
-
-	stateManager.Update(babyUID, stateUpdate)
 }

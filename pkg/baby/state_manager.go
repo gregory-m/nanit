@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog/log"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
 
 // StateManager - state manager context
@@ -36,11 +35,7 @@ func (manager *StateManager) Update(babyUID string, stateUpdate State) {
 			return
 		}
 	} else {
-		newState = (&State{
-			// Note: we always initialize the state with local streaming set to false,
-			//  because watchdog listens to updates.
-			LocalStreamingInitiated: utils.ConstRefBool(false),
-		}).Merge(&stateUpdate)
+		newState = (&State{}).Merge(&stateUpdate)
 	}
 
 	manager.babiesByUID[babyUID] = *newState

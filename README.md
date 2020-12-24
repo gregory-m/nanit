@@ -87,6 +87,9 @@ go run cmd/nanit/*.go
 
 # On proto file change
 protoc --go_out . --go_opt=paths=source_relative pkg/client/websocket.proto
+
+# Run tests
+go test ./pkg/...
 ```
 
 For some insights see [Developer notes](docs/developer-notes.md).

@@ -10,10 +10,10 @@ import (
 
 // State - struct holding information about state of a single baby
 type State struct {
-	LocalStreamingInitiated *bool
-	IsNight                 *bool
-	TemperatureMilli        *int32
-	HumidityMilli           *int32
+	IsStreamAlive    *bool
+	IsNight          *bool
+	TemperatureMilli *int32
+	HumidityMilli    *int32
 }
 
 // Merge - Merges non-nil values of an argument to the state.
@@ -127,16 +127,16 @@ func (state *State) GetHumidity() float64 {
 	return 0
 }
 
-// SetLocalStreamingInitiated - mutates field, returns itself
-func (state *State) SetLocalStreamingInitiated(value bool) *State {
-	state.LocalStreamingInitiated = &value
+// SetIsStreamAlive - mutates field, returns itself
+func (state *State) SetIsStreamAlive(value bool) *State {
+	state.IsStreamAlive = &value
 	return state
 }
 
-// GetLocalStreamingInitiated - safely returns value
-func (state *State) GetLocalStreamingInitiated() bool {
-	if state.LocalStreamingInitiated != nil {
-		return *state.LocalStreamingInitiated
+// GetIsStreamAlive - safely returns value
+func (state *State) GetIsStreamAlive() bool {
+	if state.IsStreamAlive != nil {
+		return *state.IsStreamAlive
 	}
 
 	return false
