@@ -254,16 +254,20 @@ func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
 	for {
 		select {
 		case <-timer.C:
-			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
-				log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
+			// Note: Normally we could stop trying here, but there can be a situation when the first player attempt fails due
+			// RTMP server not being ready yet. Streaming can already be requested by some previous run of the application and therefore
+			// it gets rejected (StreamRequestState_RequestFailed). However cam can still try to attempt stream to the server later, because
+			// it tries several attempts before giving up. The stream can then become alive.
+			// if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
+			log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
 
-				app.dummyPlayer(babyUID, ctx)
+			app.dummyPlayer(babyUID, ctx)
 
-				app.BabyStateManager.Update(babyUID, *baby.NewState().SetStreamState(baby.StreamState_Unhealthy))
-				if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() == baby.StreamRequestState_RequestFailed {
-					log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
-				}
+			app.BabyStateManager.Update(babyUID, *baby.NewState().SetStreamState(baby.StreamState_Unhealthy))
+			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() == baby.StreamRequestState_RequestFailed {
+				log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
 			}
+			// }
 
 			timer.Reset(5 * time.Second)
 
