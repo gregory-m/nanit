@@ -36,10 +36,9 @@ services:
     environment:
     - NANIT_EMAIL=your@email.tld
     - NANIT_PASSWORD=XXXXXXXXXXXXX
-    - NANIT_REMOTE_STREAM_ENABLED=false
-    - NANIT_HTTP_ENABLED=false
+    - NANIT_HLS_ENABLED=false
     - NANIT_LOCAL_STREAM_ENABLED=true
-    - NANIT_LOCAL_STREAM_PUSH_TARGET=rtmp://{your_ip}:1935/live
+    - NANIT_LOCAL_STREAM_PUSH_TARGET=rtmp://{your_ip_not_localhost}:1935/live
   nginx:
     image: tiangolo/nginx-rtmp
     ports:
@@ -54,6 +53,7 @@ Open `rtmp://127.0.0.1:1935/live` in VLC
 
 - [Home assistant](./docs/home-assistant.md)
 - [Homebridge](./docs/homebridge.md)
+- [Sensors](./docs/sensors.md)
 
 ### Further usage
 
