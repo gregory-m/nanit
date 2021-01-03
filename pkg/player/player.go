@@ -1,8 +1,7 @@
-package app
+package player
 
 import (
 	"io"
-	"os/exec"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -13,12 +12,12 @@ import (
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
 
-// dummyPlayer - dummy player based on the ffmpeg which we use to determine liveness of the stream
-func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
-	sublog := log.With().Str("player", babyUID).Logger()
-	url := app.getLocalStreamURL(babyUID)
+// Run - executes the player
+func Run(opts Opts, ctx utils.GracefulContext) {
+	effectiveOpts := opts.applyDefaults()
 
-	cmd := exec.Command("ffmpeg", "-i", url, "-f", "flv", "-")
+	sublog := log.With().Str("player", effectiveOpts.BabyUID).Logger()
+	cmd := effectiveOpts.Executor("ffmpeg", "-i", effectiveOpts.URL, "-f", "flv", "-")
 
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
@@ -36,7 +35,7 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 	if err != nil {
 		sublog.Fatal().Err(err).Msg("Unable to start")
 	} else {
-		sublog.Info().Str("url", url).Msg("Player started")
+		sublog.Info().Str("url", effectiveOpts.URL).Msg("Player started")
 	}
 
 	exitedC := make(chan struct{}, 1)
@@ -76,11 +75,11 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 		// fmt.Printf("Header: %+v\n", dec.Header())
 
 		sublog.Debug().Msg("Successfully decoded stream header")
-		sublog.Info().Str("url", url).Msg("Stream is alive")
+		sublog.Info().Str("url", effectiveOpts.URL).Msg("Stream is alive")
 		timeout.Stop()
 
-		app.BabyStateManager.Update(
-			babyUID,
+		effectiveOpts.BabyStateManager.Update(
+			effectiveOpts.BabyUID,
 			*baby.NewState().
 				SetStreamRequestState(baby.StreamRequestState_Requested).
 				SetStreamState(baby.StreamState_Alive),
@@ -109,7 +108,7 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 		case <-exitedC:
 			exitingFlag.Set()
 			timeout.Stop()
-			exitCode := cmd.ProcessState.ExitCode()
+			exitCode := cmd.ExitCode()
 			if exitCode == -1 {
 				sublog.Debug().Msg("Player terminated")
 			} else {
@@ -123,7 +122,7 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 			if !exitingFlag.IsSet() {
 				exitingFlag.Set()
 				sublog.Warn().Msg("Stream timout, killing the player process")
-				cmd.Process.Kill()
+				cmd.Kill()
 			}
 
 		case <-ctx.Done():
@@ -131,12 +130,12 @@ func (app *App) dummyPlayer(babyUID string, ctx utils.GracefulContext) {
 				exitingFlag.Set()
 				sublog.Debug().Msg("Cancel request received, killing the player process")
 				timeout.Stop()
-				cmd.Process.Kill()
+				cmd.Kill()
 			}
 		case <-decoderC:
 			sublog.Warn().Msg("Decoder failure, killing the player process")
 			timeout.Stop()
-			cmd.Process.Kill()
+			cmd.Kill()
 		}
 	}
 }

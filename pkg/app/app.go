@@ -13,6 +13,7 @@ import (
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
 	"gitlab.com/adam.stanek/nanit/pkg/client"
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
+	"gitlab.com/adam.stanek/nanit/pkg/player"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
@@ -261,7 +262,11 @@ func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
 			// if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
 			log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
 
-			app.dummyPlayer(babyUID, ctx)
+			player.Run(player.Opts{
+				BabyUID:          babyUID,
+				URL:              app.getLocalStreamURL(babyUID),
+				BabyStateManager: app.BabyStateManager,
+			}, ctx)
 
 			app.BabyStateManager.Update(babyUID, *baby.NewState().SetStreamState(baby.StreamState_Unhealthy))
 			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() == baby.StreamRequestState_RequestFailed {
