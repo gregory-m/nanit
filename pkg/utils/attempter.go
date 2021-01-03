@@ -72,6 +72,7 @@ func RunWithPerseverance(handler func(AttemptContext), ctx GracefulContext, opts
 			if opts.ResetThreshold > 0 && timeTaken > opts.ResetThreshold {
 				sublog.Trace().Msgf("Previous attempt was %v ago, resetting tries", timeTaken)
 				try = 1
+				timer.Reset(0)
 			} else {
 				cooldown := opts.Cooldown[MinInt(try, len(opts.Cooldown))-1]
 				try++
