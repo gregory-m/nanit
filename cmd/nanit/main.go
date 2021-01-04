@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"regexp"
 
 	"github.com/rs/zerolog/log"
 	"gitlab.com/adam.stanek/nanit/pkg/app"
@@ -26,13 +27,16 @@ func main() {
 		HTTPEnabled:     false,
 	}
 
-	if utils.EnvVarBool("NANIT_HLS_ENABLED", true) {
-		opts.HTTPEnabled = true
-		opts.StreamProcessor = &app.StreamProcessorOpts{
-			CommandTemplate: utils.EnvVarStr(
-				"NANIT_HLS_CMD",
-				"ffmpeg -i {remoteStreamUrl} -codec copy -hls_time 1 -hls_wrap 10 -hls_flags delete_segments -hls_segment_filename {babyUid}-%02d.ts {babyUid}.m3u8",
-			),
+	if utils.EnvVarBool("NANIT_RTMP_ENABLED", false) {
+		publicAddr := utils.EnvVarReqStr("NANIT_RTMP_ADDR")
+		m := regexp.MustCompile("(:[0-9]+)$").FindStringSubmatch(publicAddr)
+		if len(m) != 2 {
+			log.Fatal().Msg("Invalid NANIT_RTMP_ADDR. Unable to parse port.")
+		}
+
+		opts.RTMP = &app.RTMPOpts{
+			ListenAddr: m[1],
+			PublicAddr: publicAddr,
 		}
 	}
 
@@ -43,12 +47,6 @@ func main() {
 			Username:    utils.EnvVarStr("NANIT_MQTT_USERNAME", ""),
 			Password:    utils.EnvVarStr("NANIT_MQTT_PASSWORD", ""),
 			TopicPrefix: utils.EnvVarStr("NANIT_MQTT_PREFIX", "nanit"),
-		}
-	}
-
-	if utils.EnvVarBool("NANIT_LOCAL_STREAM_ENABLED", false) {
-		opts.LocalStreaming = &app.LocalStreamingOpts{
-			PushTargetURLTemplate: utils.EnvVarReqStr("NANIT_LOCAL_STREAM_PUSH_TARGET"),
 		}
 	}
 

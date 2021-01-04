@@ -58,7 +58,7 @@ func runMqtt(conn *Connection, attempt utils.AttemptContext) {
 	log.Info().Str("broker_url", conn.Opts.BrokerURL).Msg("Successfully connected to MQTT broker")
 
 	unsubscribe := conn.StateManager.Subscribe(func(babyUID string, state baby.State) {
-		for key, value := range state.AsMap(false) {
+		publish := func(key string, value interface{}) {
 			topic := fmt.Sprintf("%v/babies/%v/%v", conn.Opts.TopicPrefix, babyUID, key)
 			log.Trace().Str("topic", topic).Interface("value", value).Msg("MQTT publish")
 
@@ -66,6 +66,14 @@ func runMqtt(conn *Connection, attempt utils.AttemptContext) {
 			if token.Wait(); token.Error() != nil {
 				log.Error().Err(token.Error()).Msgf("Unable to publish %v update", key)
 			}
+		}
+
+		for key, value := range state.AsMap(false) {
+			publish(key, value)
+		}
+
+		if state.StreamState != nil && *state.StreamState != baby.StreamState_Unknown {
+			publish("is_stream_alive", *state.StreamState == baby.StreamState_Alive)
 		}
 	})
 

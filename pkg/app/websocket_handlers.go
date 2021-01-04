@@ -25,16 +25,23 @@ func processSensorData(babyUID string, sensorData []*client.SensorData, stateMan
 	stateManager.Update(babyUID, stateUpdate)
 }
 
-func requestLocalStreaming(babyUID string, targetURL string, conn *client.WebsocketConnection, stateManager *baby.StateManager) {
+func requestLocalStreaming(babyUID string, targetURL string, streamingStatus client.Streaming_Status, conn *client.WebsocketConnection, stateManager *baby.StateManager) {
 	for {
-		log.Info().Str("target", targetURL).Msg("Requesting local streaming")
+		switch streamingStatus {
+		case client.Streaming_STARTED:
+			log.Info().Str("target", targetURL).Msg("Requesting local streaming")
+		case client.Streaming_PAUSED:
+			log.Info().Str("target", targetURL).Msg("Pausing local streaming")
+		case client.Streaming_STOPPED:
+			log.Info().Str("target", targetURL).Msg("Stopping local streaming")
+		}
 
 		awaitResponse := conn.SendRequest(client.RequestType_PUT_STREAMING, &client.Request{
 			Streaming: &client.Streaming{
 				Id:       client.StreamIdentifier(client.StreamIdentifier_MOBILE).Enum(),
 				RtmpUrl:  utils.ConstRefStr(targetURL),
-				Status:   client.Streaming_Status(client.Streaming_STARTED).Enum(),
-				Attempts: utils.ConstRefInt32(3),
+				Status:   client.Streaming_Status(streamingStatus).Enum(),
+				Attempts: utils.ConstRefInt32(1),
 			},
 		})
 

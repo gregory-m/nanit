@@ -14,6 +14,7 @@ import (
 	"gitlab.com/adam.stanek/nanit/pkg/client"
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
 	"gitlab.com/adam.stanek/nanit/pkg/player"
+	"gitlab.com/adam.stanek/nanit/pkg/rtmpserver"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
@@ -57,6 +58,11 @@ func (app *App) Run(ctx utils.GracefulContext) {
 	// Fetches babies info if they are not present in session
 	app.RestClient.EnsureBabies()
 
+	// RTMP
+	if app.Opts.RTMP != nil {
+		go rtmpserver.StartRTMPServer(app.Opts.RTMP.ListenAddr, app.BabyStateManager)
+	}
+
 	// MQTT
 	if app.MQTTConnection != nil {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
@@ -80,30 +86,8 @@ func (app *App) Run(ctx utils.GracefulContext) {
 }
 
 func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
-	// Remote stream processing
-	if app.Opts.StreamProcessor != nil {
-		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
-			utils.RunWithPerseverance(func(attempt utils.AttemptContext) {
-				// Reauthorize if it is not a first try or we assume we don't have a valid token
-				app.RestClient.MaybeAuthorize(attempt.GetTry() > 1)
-
-				app.runStreamProcess(baby.UID, "hls-capture", app.Opts.StreamProcessor.CommandTemplate, attempt)
-			}, childCtx, utils.PerseverenceOpts{
-				RunnerID:       fmt.Sprintf("hls-capture-%v", baby.UID),
-				ResetThreshold: 2 * time.Second,
-				Cooldown: []time.Duration{
-					2 * time.Second,
-					30 * time.Second,
-					2 * time.Minute,
-					15 * time.Minute,
-					1 * time.Hour,
-				},
-			})
-		})
-	}
-
 	// Websocket connection
-	if app.Opts.LocalStreaming != nil || app.MQTTConnection != nil {
+	if app.Opts.RTMP != nil || app.MQTTConnection != nil {
 		// Websocket connection
 		ws := client.NewWebsocketConnectionManager(baby.CameraUID, app.SessionStore.Session, app.RestClient)
 
@@ -114,13 +98,6 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			ws.RunWithinContext(childCtx)
 		})
-
-		// Watchdog
-		if app.Opts.LocalStreaming != nil {
-			ctx.RunAsChild(func(childCtx utils.GracefulContext) {
-				app.runWatchDog(baby.UID, ctx)
-			})
-		}
 	}
 
 	<-ctx.Done()
@@ -219,25 +196,35 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 	// 	},
 	// })
 
-	initializeLocalStreaming := func() {
-		requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), conn, app.BabyStateManager)
-	}
+	var cleanup func()
 
-	// Watch for stream liveness change
-	unsubscribe := app.BabyStateManager.Subscribe(func(updatedBabyUID string, stateUpdate baby.State) {
-		// Do another streaming request if stream just turned unhealthy
-		if updatedBabyUID == babyUID && stateUpdate.StreamState != nil && *stateUpdate.StreamState == baby.StreamState_Unhealthy {
-			// Prevent duplicate request if we already received failure
-			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
-				go initializeLocalStreaming()
-			}
+	// Local streaming
+	if app.Opts.RTMP != nil {
+		initializeLocalStreaming := func() {
+			requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), client.Streaming_STARTED, conn, app.BabyStateManager)
 		}
-	})
 
-	// Initialize local streaming upon connection if we know that the stream is not alive
-	if app.Opts.LocalStreaming != nil {
+		// Watch for stream liveness change
+		unsubscribe := app.BabyStateManager.Subscribe(func(updatedBabyUID string, stateUpdate baby.State) {
+			// Do another streaming request if stream just turned unhealthy
+			if updatedBabyUID == babyUID && stateUpdate.StreamState != nil && *stateUpdate.StreamState == baby.StreamState_Unhealthy {
+				// Prevent duplicate request if we already received failure
+				if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
+					go initializeLocalStreaming()
+				}
+			}
+		})
+
+		cleanup = func() {
+			// Stop listening for stream liveness change
+			unsubscribe()
+
+			// Stop local streaming
+			requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), client.Streaming_STOPPED, conn, app.BabyStateManager)
+		}
+
+		// Initialize local streaming upon connection if we know that the stream is not alive
 		babyState := app.BabyStateManager.GetBabyState(babyUID)
-
 		if babyState.GetStreamState() != baby.StreamState_Alive {
 			if babyState.GetStreamRequestState() != baby.StreamRequestState_Requested || babyState.GetStreamState() == baby.StreamState_Unhealthy {
 				go initializeLocalStreaming()
@@ -246,7 +233,9 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 	}
 
 	<-childCtx.Done()
-	unsubscribe()
+	if cleanup != nil {
+		cleanup()
+	}
 }
 
 func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
@@ -288,9 +277,9 @@ func (app *App) getRemoteStreamURL(babyUID string) string {
 }
 
 func (app *App) getLocalStreamURL(babyUID string) string {
-	if app.Opts.LocalStreaming != nil {
-		tpl := app.Opts.LocalStreaming.PushTargetURLTemplate
-		return strings.NewReplacer("{babyUid}", babyUID).Replace(tpl)
+	if app.Opts.RTMP != nil {
+		tpl := "rtmp://{publicAddr}/local/{babyUid}"
+		return strings.NewReplacer("{publicAddr}", app.Opts.RTMP.PublicAddr, "{babyUid}", babyUID).Replace(tpl)
 	}
 
 	return ""

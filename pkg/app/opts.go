@@ -13,6 +13,7 @@ type Opts struct {
 	MQTT             *mqtt.Opts
 	StreamProcessor  *StreamProcessorOpts
 	LocalStreaming   *LocalStreamingOpts
+	RTMP             *RTMPOpts
 }
 
 // NanitCredentials - user credentials for Nanit account
@@ -26,6 +27,15 @@ type DataDirectories struct {
 	BaseDir  string
 	VideoDir string
 	LogDir   string
+}
+
+// RTMPOpts - options for RTMP streaming
+type RTMPOpts struct {
+	// IP:Port of the interface on which we should listen
+	ListenAddr string
+
+	// IP:Port under which can Cam reach the RTMP server
+	PublicAddr string
 }
 
 // StreamProcessorOpts - options to run stream processor
