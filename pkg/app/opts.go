@@ -11,8 +11,6 @@ type Opts struct {
 	DataDirectories  DataDirectories
 	HTTPEnabled      bool
 	MQTT             *mqtt.Opts
-	StreamProcessor  *StreamProcessorOpts
-	LocalStreaming   *LocalStreamingOpts
 	RTMP             *RTMPOpts
 }
 
@@ -36,14 +34,4 @@ type RTMPOpts struct {
 
 	// IP:Port under which can Cam reach the RTMP server
 	PublicAddr string
-}
-
-// StreamProcessorOpts - options to run stream processor
-type StreamProcessorOpts struct {
-	CommandTemplate string
-}
-
-// LocalStreamingOpts - options for local streaming
-type LocalStreamingOpts struct {
-	PushTargetURLTemplate string
 }

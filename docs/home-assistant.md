@@ -6,7 +6,7 @@ Configuration example:
 camera:
 - name: Nanit
   platform: ffmpeg
-  input: rtmp://xxx.xxx.xxx.xxx:1935/live
+  input: rtmp://xxx.xxx.xxx.xxx:1935/local/{your_baby_uid}
 
 sensor:
 - name: "Nanit Temperature"

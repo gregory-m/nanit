@@ -1,19 +1,12 @@
 package app
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/rs/zerolog/log"
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
 	"gitlab.com/adam.stanek/nanit/pkg/client"
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
-	"gitlab.com/adam.stanek/nanit/pkg/player"
 	"gitlab.com/adam.stanek/nanit/pkg/rtmpserver"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
@@ -103,59 +96,6 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 	<-ctx.Done()
 }
 
-func (app *App) runStreamProcess(babyUID string, name string, commandTemplate string, attempt utils.GracefulContext) {
-	sublog := log.With().Str("processor", name).Logger()
-
-	logFilename := filepath.Join(app.Opts.DataDirectories.LogDir, fmt.Sprintf("%v-%v-%v.log", name, babyUID, time.Now().Format(time.RFC3339)))
-
-	r := strings.NewReplacer("{remoteStreamUrl}", app.getRemoteStreamURL(babyUID), "{localStreamUrl}", app.getLocalStreamURL(babyUID), "{babyUid}", babyUID)
-	cmdTokens := strings.Split(r.Replace(commandTemplate), " ")
-
-	logFile, fileErr := os.Create(logFilename)
-	if fileErr != nil {
-		sublog.Fatal().Str("filename", logFilename).Err(fileErr).Msg("Unable to create log file")
-	}
-
-	defer logFile.Close()
-
-	sublog.Info().Str("cmd", strings.Join(cmdTokens, " ")).Str("logfile", logFilename).Msg("Starting stream processor")
-
-	cmd := exec.Command(cmdTokens[0], cmdTokens[1:]...)
-	cmd.Stderr = logFile
-	cmd.Stdout = logFile
-	cmd.Dir = app.Opts.DataDirectories.VideoDir
-
-	err := cmd.Start()
-	if err != nil {
-		sublog.Fatal().Err(err).Msg("Unable to start stream processor")
-	}
-
-	done := make(chan error, 1)
-
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			sublog.Error().Err(err).Msg("Stream processor exited")
-			attempt.Fail(err)
-			return
-		}
-
-		sublog.Warn().Msg("Stream processor exited with status 0")
-		attempt.Fail(errors.New("Stream processor exited with status 0"))
-		return
-
-	case <-attempt.Done():
-		sublog.Info().Msg("Terminating stream processor")
-		if err := cmd.Process.Kill(); err != nil {
-			sublog.Error().Err(err).Msg("Unable to kill process")
-		}
-	}
-}
-
 func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
 	// Reading sensor data
 	conn.RegisterMessageHandler(func(m *client.Message, conn *client.WebsocketConnection) {
@@ -237,40 +177,6 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 	<-childCtx.Done()
 	if cleanup != nil {
 		cleanup()
-	}
-}
-
-func (app *App) runWatchDog(babyUID string, ctx utils.GracefulContext) {
-	timer := time.NewTimer(0)
-
-	for {
-		select {
-		case <-timer.C:
-			// Note: Normally we could stop trying here, but there can be a situation when the first player attempt fails due
-			// RTMP server not being ready yet. Streaming can already be requested by some previous run of the application and therefore
-			// it gets rejected (StreamRequestState_RequestFailed). However cam can still try to attempt stream to the server later, because
-			// it tries several attempts before giving up. The stream can then become alive.
-			// if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() != baby.StreamRequestState_RequestFailed {
-			log.Debug().Str("baby_uid", babyUID).Msg("Starting local stream watch dog")
-
-			player.Run(player.Opts{
-				BabyUID:          babyUID,
-				URL:              app.getLocalStreamURL(babyUID),
-				BabyStateManager: app.BabyStateManager,
-			}, ctx)
-
-			app.BabyStateManager.Update(babyUID, *baby.NewState().SetStreamState(baby.StreamState_Unhealthy))
-			if app.BabyStateManager.GetBabyState(babyUID).GetStreamRequestState() == baby.StreamRequestState_RequestFailed {
-				log.Error().Str("baby_uid", babyUID).Msg("Stream is dead and we failed to request it")
-			}
-			// }
-
-			timer.Reset(5 * time.Second)
-
-		case <-ctx.Done():
-			log.Debug().Str("baby_uid", babyUID).Msg("Terminating watchdog")
-			return
-		}
 	}
 }
 

@@ -10,7 +10,7 @@
     {
       "name": "Nanit",
       "videoConfig": {
-        "source": "-i rtmp://xxx.xxx.xxx.xxx:1935/live",
+        "source": "-i rtmp://xxx.xxx.xxx.xxx:1935/local/{your_baby_uid}",
         "maxWidth": 1280,
         "maxHeight": 960,
         "maxFPS": 10,
