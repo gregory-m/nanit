@@ -62,6 +62,10 @@ func requestLocalStreaming(babyUID string, targetURL string, streamingStatus cli
 				return
 			}
 
+			if !conn.IsConnected() {
+				return
+			}
+
 			log.Warn().Msg("Streaming request timeout, trying again")
 
 		} else {

@@ -220,7 +220,9 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 			unsubscribe()
 
 			// Stop local streaming
-			requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), client.Streaming_STOPPED, conn, app.BabyStateManager)
+			if conn.IsConnected() {
+				requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), client.Streaming_STOPPED, conn, app.BabyStateManager)
+			}
 		}
 
 		// Initialize local streaming upon connection if we know that the stream is not alive
