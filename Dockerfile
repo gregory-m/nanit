@@ -1,4 +1,4 @@
-ARG BASE_IMAGE_TAG
+ARG BASE_IMAGE_TAG=latest
 
 FROM golang:1.15.5-buster AS build
 ADD cmd /app/cmd
