@@ -82,7 +82,7 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 	// Websocket connection
 	if app.Opts.RTMP != nil || app.MQTTConnection != nil {
 		// Websocket connection
-		ws := client.NewWebsocketConnectionManager(baby.CameraUID, app.SessionStore.Session, app.RestClient)
+		ws := client.NewWebsocketConnectionManager(baby.UID, baby.CameraUID, app.SessionStore.Session, app.RestClient, app.BabyStateManager)
 
 		ws.WithReadyConnection(func(conn *client.WebsocketConnection, childCtx utils.GracefulContext) {
 			app.runWebsocket(baby.UID, conn, childCtx)
@@ -160,7 +160,8 @@ func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, c
 			unsubscribe()
 
 			// Stop local streaming
-			if conn.IsConnected() && app.BabyStateManager.GetBabyState(babyUID).GetStreamState() == baby.StreamState_Alive {
+			state := app.BabyStateManager.GetBabyState(babyUID)
+			if state.GetIsWebsocketAlive() && state.GetStreamState() == baby.StreamState_Alive {
 				requestLocalStreaming(babyUID, app.getLocalStreamURL(babyUID), client.Streaming_STOPPED, conn, app.BabyStateManager)
 			}
 		}

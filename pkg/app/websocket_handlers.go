@@ -62,7 +62,7 @@ func requestLocalStreaming(babyUID string, targetURL string, streamingStatus cli
 				return
 			}
 
-			if !conn.IsConnected() {
+			if !stateManager.GetBabyState(babyUID).GetIsWebsocketAlive() {
 				return
 			}
 

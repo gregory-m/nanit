@@ -28,6 +28,7 @@ const (
 type State struct {
 	StreamState        *StreamState        `internal:"true"`
 	StreamRequestState *StreamRequestState `internal:"true"`
+	IsWebsocketAlive   *bool               `internal:"true"`
 
 	IsNight          *bool
 	TemperatureMilli *int32
@@ -188,5 +189,20 @@ func (state *State) GetStreamState() StreamState {
 // SetIsNight - mutates field, returns itself
 func (state *State) SetIsNight(value bool) *State {
 	state.IsNight = &value
+	return state
+}
+
+// GetIsWebsocketAlive - safely returns value
+func (state *State) GetIsWebsocketAlive() bool {
+	if state.StreamState != nil {
+		return *state.IsWebsocketAlive
+	}
+
+	return false
+}
+
+// SetWebsocketAlive - mutates field, returns itself
+func (state *State) SetWebsocketAlive(value bool) *State {
+	state.IsWebsocketAlive = &value
 	return state
 }

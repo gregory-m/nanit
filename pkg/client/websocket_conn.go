@@ -125,11 +125,6 @@ func (conn *WebsocketConnection) SendRequest(reqType RequestType, requestData *R
 	}
 }
 
-// IsConnected - returns true if connection is alive
-func (conn *WebsocketConnection) IsConnected() bool {
-	return conn.socket.IsConnected
-}
-
 type unhandledRequest struct {
 	Request        *Request
 	HandleResponse func(response *Response)

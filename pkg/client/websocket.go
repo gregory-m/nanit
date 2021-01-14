@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/sacOO7/gowebsocket"
+	"gitlab.com/adam.stanek/nanit/pkg/baby"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
 	"google.golang.org/protobuf/proto"
@@ -23,9 +24,11 @@ type WebsocketConnectionHandler func(*WebsocketConnection, utils.GracefulContext
 
 // WebsocketConnectionManager - connection manager
 type WebsocketConnectionManager struct {
-	CameraUID string
-	Session   *session.Session
-	API       *NanitClient
+	BabyUID          string
+	CameraUID        string
+	Session          *session.Session
+	API              *NanitClient
+	BabyStateManager *baby.StateManager
 
 	mu               sync.RWMutex
 	readyState       *readyState
@@ -33,11 +36,13 @@ type WebsocketConnectionManager struct {
 }
 
 // NewWebsocketConnectionManager - constructor
-func NewWebsocketConnectionManager(cameraUID string, session *session.Session, api *NanitClient) *WebsocketConnectionManager {
+func NewWebsocketConnectionManager(babyUID string, cameraUID string, session *session.Session, api *NanitClient, babyStateManager *baby.StateManager) *WebsocketConnectionManager {
 	manager := &WebsocketConnectionManager{
-		CameraUID: cameraUID,
-		Session:   session,
-		API:       api,
+		BabyUID:          babyUID,
+		CameraUID:        cameraUID,
+		Session:          session,
+		API:              api,
+		BabyStateManager: babyStateManager,
 	}
 
 	manager.WithReadyConnection(func(conn *WebsocketConnection, ctx utils.GracefulContext) {
@@ -68,7 +73,7 @@ func (manager *WebsocketConnectionManager) WithReadyConnection(handler Websocket
 
 	if readyState != nil {
 		log.Debug().Msg("Immediatelly notifying ready handler")
-		notifyReadHandler(handler, *readyState)
+		notifyReadyHandler(handler, *readyState)
 	}
 }
 
@@ -120,10 +125,12 @@ func (manager *WebsocketConnectionManager) run(attempt utils.AttemptContext) {
 			copy(subscribedHandlers, manager.readySubscribers)
 			manager.mu.Unlock()
 
+			manager.BabyStateManager.Update(manager.BabyUID, *baby.NewState().SetWebsocketAlive(true))
+
 			log.Trace().Int("num_handlers", len(subscribedHandlers)).Msg("Notifying websocket ready handlers")
 
 			for _, handler := range subscribedHandlers {
-				notifyReadHandler(handler, readyState)
+				notifyReadyHandler(handler, readyState)
 			}
 		}()
 	}
@@ -137,6 +144,8 @@ func (manager *WebsocketConnectionManager) run(attempt utils.AttemptContext) {
 	// Handle lost connection
 	socket.OnDisconnected = func(err error, socket gowebsocket.Socket) {
 		once.Do(func() {
+			manager.BabyStateManager.Update(manager.BabyUID, *baby.NewState().SetWebsocketAlive(false))
+
 			if err != nil {
 				log.Error().Err(err).Msg("Disconnected from server")
 				attempt.Fail(err)
@@ -175,7 +184,7 @@ func (manager *WebsocketConnectionManager) run(attempt utils.AttemptContext) {
 	}
 }
 
-func notifyReadHandler(handler WebsocketConnectionHandler, state readyState) {
+func notifyReadyHandler(handler WebsocketConnectionHandler, state readyState) {
 	state.Context.RunAsChild(func(childCtx utils.GracefulContext) {
 		handler(state.Connection, childCtx)
 	})
