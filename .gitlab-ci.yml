@@ -44,7 +44,7 @@ build app image:
   - docker buildx imagetools inspect $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG > /dev/null || export BASE_IMAGE_TAG=latest
   - "echo \"Using base image: $BASE_IMAGE_WITHOUT_TAG:$BASE_IMAGE_TAG\""
   - |
-    if [ "$CI_COMMIT_REF_NAME" == "master" ] || [ "$CI_COMMIT_REF_NAME" == "dev" ]; then
+    if [ "$CI_COMMIT_REF_NAME" == "master" ] || [ "$CI_COMMIT_REF_NAME" == "dev" ] || [[ "$CI_COMMIT_REF_NAME" =~ v[0-9].* ]]; then
       PLATFORM="linux/arm/v7,linux/arm64/v8,linux/amd64"
     else
       PLATFORM="linux/amd64"
