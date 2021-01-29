@@ -17,6 +17,7 @@ This is sleepless night induced pet project to restream Nanit Baby Monitor live 
 docker run --rm \
   -e NANIT_EMAIL=your@email.tld \
   -e NANIT_PASSWORD=XXXXXXXXXXXXX \
+  -e NANIT_RTMP_ENABLED=true \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
   -p 1935:1935 \
   registry.gitlab.com/adam.stanek/nanit:v0-6
