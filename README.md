@@ -29,6 +29,7 @@ Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC. You will find your ba
 - [Home assistant](./docs/home-assistant.md)
 - [Homebridge](./docs/homebridge.md)
 - [Sensors](./docs/sensors.md)
+- [Docker compose](./docs/docker-compose.md)
 
 ### Further usage
 
