@@ -27,7 +27,7 @@ func main() {
 		HTTPEnabled:     false,
 	}
 
-	if utils.EnvVarBool("NANIT_RTMP_ENABLED", false) {
+	if utils.EnvVarBool("NANIT_RTMP_ENABLED", true) {
 		publicAddr := utils.EnvVarReqStr("NANIT_RTMP_ADDR")
 		m := regexp.MustCompile("(:[0-9]+)$").FindStringSubmatch(publicAddr)
 		if len(m) != 2 {
