@@ -72,7 +72,7 @@ func (manager *WebsocketConnectionManager) WithReadyConnection(handler Websocket
 	manager.mu.Unlock()
 
 	if readyState != nil {
-		log.Debug().Msg("Immediatelly notifying ready handler")
+		log.Debug().Msg("Immediately notifying ready handler")
 		notifyReadyHandler(handler, *readyState)
 	}
 }

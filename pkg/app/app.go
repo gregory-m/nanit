@@ -65,8 +65,9 @@ func (app *App) Run(ctx utils.GracefulContext) {
 
 	// Start reading the data from the stream
 	for _, babyInfo := range app.SessionStore.Session.Babies {
+		_babyInfo := babyInfo
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
-			app.handleBaby(babyInfo, childCtx)
+			app.handleBaby(_babyInfo, childCtx)
 		})
 	}
 
@@ -79,7 +80,6 @@ func (app *App) Run(ctx utils.GracefulContext) {
 }
 
 func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
-	// Websocket connection
 	if app.Opts.RTMP != nil || app.MQTTConnection != nil {
 		// Websocket connection
 		ws := client.NewWebsocketConnectionManager(baby.UID, baby.CameraUID, app.SessionStore.Session, app.RestClient, app.BabyStateManager)
