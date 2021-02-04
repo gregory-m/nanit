@@ -17,10 +17,9 @@ This is sleepless night induced pet project to restream Nanit Baby Monitor live 
 docker run --rm \
   -e NANIT_EMAIL=your@email.tld \
   -e NANIT_PASSWORD=XXXXXXXXXXXXX \
-  -e NANIT_RTMP_ENABLED=true \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
   -p 1935:1935 \
-  registry.gitlab.com/adam.stanek/nanit:v0-6
+  registry.gitlab.com/adam.stanek/nanit:v0-7
 ```
 
 Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC. You will find your baby UID in the log of running application.

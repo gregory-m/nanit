@@ -11,7 +11,7 @@ version: '2'
 services:
   nanit:
     # Image to pull, adjust the :suffix for your version tag
-    image: registry.gitlab.com/adam.stanek/nanit:v0-6
+    image: registry.gitlab.com/adam.stanek/nanit:v0-7
     # Makes the container auto-start whenever you restart your computer
     restart: unless-stopped
     # Expose the RTMP port
@@ -21,7 +21,6 @@ services:
     environment:
     - NANIT_EMAIL=your@email.tld
     - NANIT_PASSWORD=XXXXXXXXXXXXX
-    - NANIT_RTMP_ENABLED=true
     - NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935
 ```
 
