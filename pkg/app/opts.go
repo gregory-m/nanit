@@ -16,8 +16,9 @@ type Opts struct {
 
 // NanitCredentials - user credentials for Nanit account
 type NanitCredentials struct {
-	Email    string
-	Password string
+	Email        string
+	Password     string
+	RefreshToken string
 }
 
 // DataDirectories - dictionary of dir paths
