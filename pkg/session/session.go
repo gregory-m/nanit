@@ -16,10 +16,11 @@ const Revision = 2
 
 // Session - application session data container
 type Session struct {
-	Revision  int         `json:"revision"`
-	AuthToken string      `json:"authToken"`
-	AuthTime  time.Time   `json:"authTime"`
-	Babies    []baby.Baby `json:"babies"`
+	Revision     int         `json:"revision"`
+	AuthToken    string      `json:"authToken"`
+	AuthTime     time.Time   `json:"authTime"`
+	Babies       []baby.Baby `json:"babies"`
+	RefreshToken string      `json:"refreshToken"`
 }
 
 // Store - application session store context
