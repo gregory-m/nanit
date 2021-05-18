@@ -41,8 +41,8 @@ docker-compose stop
 
 # Upgrade the app (ie. after you have changed the version tag or to pull fresh dev image)
 docker-compose pull  # pulls fresh image
-docker-compose down  # removes previously create container
-docker-compose up -d # creates new container with fresh image
+docker-compose down  # removes previously created container
+docker-compose up -d # creates new container with fresh image (do this after every change in the docker-compose file)
 
 # Uninstall the app
 docker-compose down
