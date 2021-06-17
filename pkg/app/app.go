@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
 	"gitlab.com/adam.stanek/nanit/pkg/client"
@@ -88,12 +89,30 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 			app.runWebsocket(baby.UID, conn, childCtx)
 		})
 
+		go app.pollMessages(baby.UID, app.BabyStateManager)
+
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			ws.RunWithinContext(childCtx)
 		})
 	}
 
 	<-ctx.Done()
+}
+
+func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager) {
+	new_messages := app.RestClient.FetchNewMessages(babyUID)
+
+	for _, message := range new_messages {
+		if message.Type == "SOUND" {
+			go babyStateManager.NotifySoundSubscribers(babyUID)
+			break
+		} else if message.Type == "MOTION" {
+			go babyStateManager.NotifyMotionSubscribers(babyUID)
+			break
+		}
+	}
+	time.Sleep(30) // sleep for 30 seconds
+	app.pollMessages(babyUID, babyStateManager)
 }
 
 func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, childCtx utils.GracefulContext) {

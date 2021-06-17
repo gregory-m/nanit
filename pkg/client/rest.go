@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -22,6 +23,10 @@ type authResponsePayload struct {
 
 type babiesResponsePayload struct {
 	Babies []baby.Baby `json:"babies"`
+}
+
+type messagesResponsePayload struct {
+	Messages []baby.Message `json:"messages"`
 }
 
 // ------------------------------------------
@@ -131,6 +136,21 @@ func (c *NanitClient) FetchBabies() []baby.Baby {
 	return data.Babies
 }
 
+// FetchMessages - fetches message list
+func (c *NanitClient) FetchMessages(baby_uid string) []baby.Message {
+	log.Info().Msg("Fetching messages list")
+	req, reqErr := http.NewRequest("GET", fmt.Sprintf("https://api.nanit.com/babies/%s/messages", baby_uid), nil)
+
+	if reqErr != nil {
+		log.Fatal().Err(reqErr).Msg("Unable to create request")
+	}
+
+	data := new(messagesResponsePayload)
+	c.FetchAuthorized(req, data)
+
+	return data.Messages
+}
+
 // EnsureBabies - fetches baby list if not fetched already
 func (c *NanitClient) EnsureBabies() []baby.Baby {
 	if len(c.SessionStore.Session.Babies) == 0 {
@@ -138,4 +158,35 @@ func (c *NanitClient) EnsureBabies() []baby.Baby {
 	}
 
 	return c.SessionStore.Session.Babies
+}
+
+// FetchNewMessages - fetches new messages
+func (c *NanitClient) FetchNewMessages(baby_uid string) []baby.Message {
+	new_messages := make([]baby.Message, 10)
+	messages := c.FetchMessages(baby_uid)
+	prev_messages := c.SessionStore.Session.Messages
+
+	if len(messages) == 0 {
+		return new_messages
+	}
+	// len(messages) > 0
+
+	if len(prev_messages) > 0 && prev_messages[0].Time == messages[0].Time {
+		return new_messages
+	}
+	// new messages!
+
+	for _, message := range messages {
+		if message.Time <= prev_messages[0].Time {
+			return new_messages
+		}
+		// new message found
+		new_messages = append(new_messages, message) // IIRC... checking
+	}
+
+	// save state
+	c.SessionStore.Session.Messages = new_messages
+	c.SessionStore.Save()
+
+	return new_messages
 }

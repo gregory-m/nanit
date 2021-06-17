@@ -30,6 +30,8 @@ type State struct {
 	StreamRequestState *StreamRequestState `internal:"true"`
 	IsWebsocketAlive   *bool               `internal:"true"`
 
+	Motion           *bool
+	Sound            *bool
 	IsNight          *bool
 	TemperatureMilli *int32
 	HumidityMilli    *int32
@@ -189,6 +191,16 @@ func (state *State) GetStreamState() StreamState {
 // SetIsNight - mutates field, returns itself
 func (state *State) SetIsNight(value bool) *State {
 	state.IsNight = &value
+	return state
+}
+
+func (state *State) SetMotion(value bool) *State {
+	state.Motion = &value
+	return state
+}
+
+func (state *State) SetSound(value bool) *State {
+	state.Sound = &value
 	return state
 }
 

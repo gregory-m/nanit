@@ -76,6 +76,22 @@ func (manager *StateManager) GetBabyState(babyUID string) *State {
 	return &babyState
 }
 
+func (manager *StateManager) NotifyMotionSubscribers(babyUID string) {
+	motion := new(bool)
+	*motion = true
+	var state = State{Motion: motion}
+
+	manager.notifySubscribers(babyUID, state)
+}
+
+func (manager *StateManager) NotifySoundSubscribers(babyUID string) {
+	sound := new(bool)
+	*sound = true
+	var state = State{Sound: sound}
+
+	manager.notifySubscribers(babyUID, state)
+}
+
 func (manager *StateManager) notifySubscribers(babyUID string, state State) {
 	manager.subscribersMutex.RLock()
 
