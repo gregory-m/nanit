@@ -177,8 +177,8 @@ func (c *NanitClient) FetchNewMessages(baby_uid string) []baby.Message {
 	// new messages!
 
 	for _, message := range messages {
-		if message.Time <= prev_messages[0].Time {
-			return new_messages
+		if len(prev_messages) > 0 && message.Time <= prev_messages[0].Time {
+			break
 		}
 		// new message found
 		new_messages = append(new_messages, message) // IIRC... checking
