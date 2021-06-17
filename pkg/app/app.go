@@ -111,7 +111,7 @@ func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager
 			break
 		}
 	}
-	time.Sleep(30) // sleep for 30 seconds
+	time.Sleep(30 * 1000 * 1000 * 1000) // sleep for 30 seconds
 	app.pollMessages(babyUID, babyStateManager)
 }
 
