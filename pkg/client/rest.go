@@ -137,9 +137,9 @@ func (c *NanitClient) FetchBabies() []baby.Baby {
 }
 
 // FetchMessages - fetches message list
-func (c *NanitClient) FetchMessages(baby_uid string) []baby.Message {
+func (c *NanitClient) FetchMessages(baby_uid string, limit int) []baby.Message {
 	log.Info().Msg("Fetching messages list")
-	req, reqErr := http.NewRequest("GET", fmt.Sprintf("https://api.nanit.com/babies/%s/messages", baby_uid), nil)
+	req, reqErr := http.NewRequest("GET", fmt.Sprintf("https://api.nanit.com/babies/%s/messages?limit=%d", baby_uid, limit), nil)
 
 	if reqErr != nil {
 		log.Fatal().Err(reqErr).Msg("Unable to create request")
@@ -162,9 +162,9 @@ func (c *NanitClient) EnsureBabies() []baby.Baby {
 
 // FetchNewMessages - fetches new messages
 func (c *NanitClient) FetchNewMessages(baby_uid string) []baby.Message {
-	new_messages := make([]baby.Message, 0)
-	messages := c.FetchMessages(baby_uid)
 	prev_messages := c.SessionStore.Session.Messages
+	messages := c.FetchMessages(baby_uid, 10)
+	new_messages := make([]baby.Message, 0)
 	log.Info().Msg(fmt.Sprintf("Fetched new messages: %d %d", len(prev_messages), len(messages)))
 
 	if len(messages) == 0 {
@@ -172,6 +172,16 @@ func (c *NanitClient) FetchNewMessages(baby_uid string) []baby.Message {
 		return new_messages
 	}
 	// len(messages) > 0
+
+	if len(prev_messages) == 0 {
+		now := time.Now()
+		five_min_ago := now.Add(time.Duration(-5) * time.Minute)
+		latest := time.Unix(int64(messages[0].Time), 0)
+		if five_min_ago.Unix() > latest.Unix() {
+			log.Info().Msg("Fetching new messages: first fetch latest message was over 5min ago")
+			return new_messages
+		}
+	}
 
 	if len(prev_messages) > 0 && prev_messages[0].Time == messages[0].Time {
 		log.Info().Msg("Fetching new messages: no new messages since last checked")
