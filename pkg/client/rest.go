@@ -162,16 +162,19 @@ func (c *NanitClient) EnsureBabies() []baby.Baby {
 
 // FetchNewMessages - fetches new messages
 func (c *NanitClient) FetchNewMessages(baby_uid string) []baby.Message {
-	new_messages := make([]baby.Message, 10)
+	new_messages := make([]baby.Message, 0)
 	messages := c.FetchMessages(baby_uid)
 	prev_messages := c.SessionStore.Session.Messages
+	log.Info().Msg(fmt.Sprintf("Fetched new messages: %d %d", len(prev_messages), len(messages)))
 
 	if len(messages) == 0 {
+		log.Info().Msg("Fetching new messages: no new messages")
 		return new_messages
 	}
 	// len(messages) > 0
 
 	if len(prev_messages) > 0 && prev_messages[0].Time == messages[0].Time {
+		log.Info().Msg("Fetching new messages: no new messages since last checked")
 		return new_messages
 	}
 	// new messages!
@@ -181,8 +184,10 @@ func (c *NanitClient) FetchNewMessages(baby_uid string) []baby.Message {
 			break
 		}
 		// new message found
-		new_messages = append(new_messages, message) // IIRC... checking
+		new_messages = append(new_messages, message)
 	}
+
+	log.Info().Msg(fmt.Sprintf("Found new messages: %d", len(new_messages)))
 
 	// save state
 	c.SessionStore.Session.Messages = new_messages
