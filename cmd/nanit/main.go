@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"gitlab.com/adam.stanek/nanit/pkg/app"
@@ -25,6 +26,12 @@ func main() {
 		SessionFile:     utils.EnvVarStr("NANIT_SESSION_FILE", ""),
 		DataDirectories: ensureDataDirectories(),
 		HTTPEnabled:     false,
+		EventPolling: app.EventPollingOpts{
+			// Event message polling disabled by default
+			Enabled: utils.EnvVarBool("NANIT_EVENTS_POLLING", false),
+			// 30 second default polling interval
+			PollingInterval: utils.EnvVarSeconds("NANIT_EVENTS_POLLING_INTERVAL", 30*time.Second),
+		},
 	}
 
 	if utils.EnvVarBool("NANIT_RTMP_ENABLED", true) {
@@ -48,6 +55,10 @@ func main() {
 			Password:    utils.EnvVarStr("NANIT_MQTT_PASSWORD", ""),
 			TopicPrefix: utils.EnvVarStr("NANIT_MQTT_PREFIX", "nanit"),
 		}
+	}
+
+	if opts.EventPolling.Enabled {
+		log.Trace().Msgf("Event polling enabled with an interval of %v", opts.EventPolling.PollingInterval)
 	}
 
 	interrupt := make(chan os.Signal, 1)

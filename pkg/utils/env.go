@@ -3,6 +3,8 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
@@ -45,6 +47,24 @@ func EnvVarBool(varName string, defaultValue bool) bool {
 
 	log.Fatal().Msgf("Unexpected value for boolean environment variable %v (allowed values true, false)", varName)
 	return false
+}
+
+// EnvVarSeconds - retrieves value of environment variable reperesenting duration in seconds, fails if variable non-parseable values
+func EnvVarSeconds(varName string, defaultValue time.Duration) time.Duration {
+	valueStr, found := os.LookupEnv(varName)
+
+	if !found {
+		return defaultValue
+	}
+
+	valueInt, err := strconv.ParseInt(valueStr, 10, 64)
+	if err != nil {
+		log.Fatal().Msgf("Unexpected value %v for environment variable %v", valueStr, varName)
+	}
+
+	value := time.Duration(valueInt)
+
+	return value
 }
 
 // LoadDotEnvFile - Loads environment variables from .env file in the current working directory (if found)

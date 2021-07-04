@@ -89,7 +89,9 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 			app.runWebsocket(baby.UID, conn, childCtx)
 		})
 
-		go app.pollMessages(baby.UID, app.BabyStateManager)
+		if app.Opts.EventPolling.Enabled {
+			go app.pollMessages(baby.UID, app.BabyStateManager)
+		}
 
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			ws.RunWithinContext(childCtx)
@@ -111,7 +113,9 @@ func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager
 			break
 		}
 	}
-	time.Sleep(30 * 1000 * 1000 * 1000) // sleep for 30 seconds
+
+	// wait for the specified interval
+	time.Sleep(app.Opts.EventPolling.PollingInterval)
 	app.pollMessages(babyUID, babyStateManager)
 }
 

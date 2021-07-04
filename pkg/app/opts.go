@@ -2,6 +2,7 @@ package app
 
 import (
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
+	"time"
 )
 
 // Opts - application run options
@@ -12,6 +13,7 @@ type Opts struct {
 	HTTPEnabled      bool
 	MQTT             *mqtt.Opts
 	RTMP             *RTMPOpts
+	EventPolling     EventPollingOpts
 }
 
 // NanitCredentials - user credentials for Nanit account
@@ -34,4 +36,9 @@ type RTMPOpts struct {
 
 	// IP:Port under which can Cam reach the RTMP server
 	PublicAddr string
+}
+
+type EventPollingOpts struct {
+	Enabled         bool
+	PollingInterval time.Duration
 }
