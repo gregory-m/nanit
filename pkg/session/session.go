@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
+	"gitlab.com/adam.stanek/nanit/pkg/message"
 )
 
 // Revision - marks the version of the structure of a session file. Only files with equal revision will be loaded
@@ -16,11 +17,11 @@ const Revision = 2
 
 // Session - application session data container
 type Session struct {
-	Revision  int            `json:"revision"`
-	AuthToken string         `json:"authToken"`
-	AuthTime  time.Time      `json:"authTime"`
-	Babies    []baby.Baby    `json:"babies"`
-	Messages  []baby.Message `json:"messages"`
+	Revision  int               `json:"revision"`
+	AuthToken string            `json:"authToken"`
+	AuthTime  time.Time         `json:"authTime"`
+	Babies    []baby.Baby       `json:"babies"`
+	Messages  []message.Message `json:"messages"`
 }
 
 // Store - application session store context
