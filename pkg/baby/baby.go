@@ -6,11 +6,3 @@ type Baby struct {
 	Name      string `json:"name"`
 	CameraUID string `json:"camera_uid"`
 }
-
-// Message - message info (matching the Nanit API)
-type Message struct {
-	UID  string `json:"baby_uid"`
-	Type string `json:"type"`
-	Time int    `json:"time"`
-	// More..
-}
