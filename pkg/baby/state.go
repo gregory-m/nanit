@@ -32,6 +32,7 @@ type State struct {
 
 	Motion           *bool
 	Sound            *bool
+	Temperature      *bool
 	IsNight          *bool
 	TemperatureMilli *int32
 	HumidityMilli    *int32

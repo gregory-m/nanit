@@ -92,6 +92,14 @@ func (manager *StateManager) NotifySoundSubscribers(babyUID string) {
 	manager.notifySubscribers(babyUID, state)
 }
 
+func (manager *StateManager) NotifyTemperatureSubscribers(babyUID string) {
+	temp := new(bool)
+	*temp = true
+	var state = State{Temperature: temp}
+
+	manager.notifySubscribers(babyUID, state)
+}
+
 func (manager *StateManager) notifySubscribers(babyUID string, state State) {
 	manager.subscribersMutex.RLock()
 

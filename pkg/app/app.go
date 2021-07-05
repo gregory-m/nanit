@@ -106,11 +106,15 @@ func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager
 	newMessages := app.RestClient.FetchNewMessages(babyUID, app.Opts.EventPolling.MessageTimeout)
 
 	for _, msg := range newMessages {
-		if msg.Type == message.SoundEventMessageType {
+		switch msg.Type {
+		case message.SoundEventMessageType:
 			go babyStateManager.NotifySoundSubscribers(babyUID)
 			break
-		} else if msg.Type == message.MotionEventMessageType {
+		case message.MotionEventMessageType:
 			go babyStateManager.NotifyMotionSubscribers(babyUID)
+			break
+		case message.TemperatureEventMessageType:
+			go babyStateManager.NotifyTemperatureSubscribers(babyUID)
 			break
 		}
 	}
