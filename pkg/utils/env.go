@@ -62,7 +62,7 @@ func EnvVarSeconds(varName string, defaultValue time.Duration) time.Duration {
 		log.Fatal().Msgf("Unexpected value %v for environment variable %v", valueStr, varName)
 	}
 
-	value := time.Duration(valueInt)
+	value := time.Duration(valueInt) * time.Second
 
 	return value
 }

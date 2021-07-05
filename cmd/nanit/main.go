@@ -58,7 +58,7 @@ func main() {
 	}
 
 	if opts.EventPolling.Enabled {
-		log.Trace().Msgf("Event polling enabled with an interval of %v", opts.EventPolling.PollingInterval)
+		log.Info().Msgf("Event polling enabled with an interval of %v", opts.EventPolling.PollingInterval)
 	}
 
 	interrupt := make(chan os.Signal, 1)
