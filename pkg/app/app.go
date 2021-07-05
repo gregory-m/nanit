@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
 	"gitlab.com/adam.stanek/nanit/pkg/client"
+	"gitlab.com/adam.stanek/nanit/pkg/message"
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
 	"gitlab.com/adam.stanek/nanit/pkg/rtmpserver"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
@@ -102,13 +103,13 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 }
 
 func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager) {
-	new_messages := app.RestClient.FetchNewMessages(babyUID)
+	newMessages := app.RestClient.FetchNewMessages(babyUID)
 
-	for _, message := range new_messages {
-		if message.Type == "SOUND" {
+	for _, msg := range newMessages {
+		if msg.Type == message.SoundEventMessageType {
 			go babyStateManager.NotifySoundSubscribers(babyUID)
 			break
-		} else if message.Type == "MOTION" {
+		} else if msg.Type == message.MotionEventMessageType {
 			go babyStateManager.NotifyMotionSubscribers(babyUID)
 			break
 		}
