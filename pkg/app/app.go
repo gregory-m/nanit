@@ -103,7 +103,7 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 }
 
 func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager) {
-	newMessages := app.RestClient.FetchNewMessages(babyUID)
+	newMessages := app.RestClient.FetchNewMessages(babyUID, app.Opts.EventPolling.MessageTimeout)
 
 	for _, msg := range newMessages {
 		if msg.Type == message.SoundEventMessageType {
