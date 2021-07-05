@@ -41,4 +41,5 @@ type RTMPOpts struct {
 type EventPollingOpts struct {
 	Enabled         bool
 	PollingInterval time.Duration
+	MessageTimeout  time.Duration
 }
