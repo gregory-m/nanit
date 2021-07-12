@@ -67,24 +67,6 @@ func EnvVarSeconds(varName string, defaultValue time.Duration) time.Duration {
 	return value
 }
 
-// EnvVarMinutes - retrieves value of environment variable reperesenting duration in minutes, fails if variable non-parseable values
-func EnvVarMinutes(varName string, defaultValue time.Duration) time.Duration {
-	valueStr, found := os.LookupEnv(varName)
-
-	if !found {
-		return defaultValue
-	}
-
-	valueInt, err := strconv.ParseInt(valueStr, 10, 64)
-	if err != nil {
-		log.Fatal().Msgf("Unexpected value %v for environment variable %v", valueStr, varName)
-	}
-
-	value := time.Duration(valueInt) * time.Minute
-
-	return value
-}
-
 // LoadDotEnvFile - Loads environment variables from .env file in the current working directory (if found)
 func LoadDotEnvFile() {
 	absFilepath, filePathErr := filepath.Abs(".env")

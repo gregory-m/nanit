@@ -31,8 +31,8 @@ func main() {
 			Enabled: utils.EnvVarBool("NANIT_EVENTS_POLLING", false),
 			// 30 second default polling interval
 			PollingInterval: utils.EnvVarSeconds("NANIT_EVENTS_POLLING_INTERVAL", 30*time.Second),
-			// 5 min default message timeout (unseen messages are ignored once they are this old)
-			MessageTimeout: utils.EnvVarMinutes("NANIT_EVENTS_MESSAGE_TIMEOUT", 5*time.Minute),
+			// 300 second (5 min) default message timeout (unseen messages are ignored once they are this old)
+			MessageTimeout: utils.EnvVarSeconds("NANIT_EVENTS_MESSAGE_TIMEOUT", 300*time.Second),
 		},
 	}
 
