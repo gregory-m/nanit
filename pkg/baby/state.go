@@ -205,6 +205,11 @@ func (state *State) SetSound(value bool) *State {
 	return state
 }
 
+func (state *State) SetTemperature(value bool) *State {
+	state.Temperature = &value
+	return state
+}
+
 // GetIsWebsocketAlive - safely returns value
 func (state *State) GetIsWebsocketAlive() bool {
 	if state.StreamState != nil {
