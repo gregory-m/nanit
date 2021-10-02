@@ -30,8 +30,8 @@ type State struct {
 	StreamRequestState *StreamRequestState `internal:"true"`
 	IsWebsocketAlive   *bool               `internal:"true"`
 
-	Motion           *bool
-	Sound            *bool
+	MotionTimestamp  *int32 // int32 is used to represent UTC timestamp
+	SoundTimestamp   *int32 // int32 is used to represent UTC timestamp
 	Temperature      *bool
 	IsNight          *bool
 	TemperatureMilli *int32
@@ -195,13 +195,13 @@ func (state *State) SetIsNight(value bool) *State {
 	return state
 }
 
-func (state *State) SetMotion(value bool) *State {
-	state.Motion = &value
+func (state *State) SetMotionTimestamp(value int32) *State {
+	state.MotionTimestamp = &value
 	return state
 }
 
-func (state *State) SetSound(value bool) *State {
-	state.Sound = &value
+func (state *State) SetSoundTimestamp(value int32) *State {
+	state.SoundTimestamp = &value
 	return state
 }
 

@@ -2,6 +2,7 @@ package baby
 
 import (
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -76,26 +77,18 @@ func (manager *StateManager) GetBabyState(babyUID string) *State {
 	return &babyState
 }
 
-func (manager *StateManager) NotifyMotionSubscribers(babyUID string) {
-	motion := new(bool)
-	*motion = true
-	var state = State{Motion: motion}
+func (manager *StateManager) NotifyMotionSubscribers(babyUID string, time time.Time) {
+	timestamp := new(int32)
+	*timestamp = int32(time.Unix())
+	var state = State{MotionTimestamp: timestamp}
 
 	manager.notifySubscribers(babyUID, state)
 }
 
-func (manager *StateManager) NotifySoundSubscribers(babyUID string) {
-	sound := new(bool)
-	*sound = true
-	var state = State{Sound: sound}
-
-	manager.notifySubscribers(babyUID, state)
-}
-
-func (manager *StateManager) NotifyTemperatureSubscribers(babyUID string) {
-	temp := new(bool)
-	*temp = true
-	var state = State{Temperature: temp}
+func (manager *StateManager) NotifySoundSubscribers(babyUID string, time time.Time) {
+	timestamp := new(int32)
+	*timestamp = int32(time.Unix())
+	var state = State{SoundTimestamp: timestamp}
 
 	manager.notifySubscribers(babyUID, state)
 }

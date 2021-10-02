@@ -108,13 +108,10 @@ func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager
 	for _, msg := range newMessages {
 		switch msg.Type {
 		case message.SoundEventMessageType:
-			go babyStateManager.NotifySoundSubscribers(babyUID)
+			go babyStateManager.NotifySoundSubscribers(babyUID, time.Time(msg.Time))
 			break
 		case message.MotionEventMessageType:
-			go babyStateManager.NotifyMotionSubscribers(babyUID)
-			break
-		case message.TemperatureEventMessageType:
-			go babyStateManager.NotifyTemperatureSubscribers(babyUID)
+			go babyStateManager.NotifyMotionSubscribers(babyUID, time.Time(msg.Time))
 			break
 		}
 	}
