@@ -34,6 +34,7 @@ func NewApp(opts Opts) *App {
 		RestClient: &client.NanitClient{
 			Email:        opts.NanitCredentials.Email,
 			Password:     opts.NanitCredentials.Password,
+			RefreshToken: opts.NanitCredentials.RefreshToken,
 			SessionStore: sessionStore,
 		},
 	}

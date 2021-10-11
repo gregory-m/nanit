@@ -20,8 +20,9 @@ func main() {
 
 	opts := app.Opts{
 		NanitCredentials: app.NanitCredentials{
-			Email:    utils.EnvVarReqStr("NANIT_EMAIL"),
-			Password: utils.EnvVarReqStr("NANIT_PASSWORD"),
+			Email:        utils.EnvVarReqStr("NANIT_EMAIL"),
+			Password:     utils.EnvVarStr("NANIT_PASSWORD", ""),
+			RefreshToken: utils.EnvVarStr("NANIT_REFRESH_TOKEN", ""),
 		},
 		SessionFile:     utils.EnvVarStr("NANIT_SESSION_FILE", ""),
 		DataDirectories: ensureDataDirectories(),

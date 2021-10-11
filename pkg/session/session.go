@@ -20,6 +20,7 @@ type Session struct {
 	AuthToken           string      `json:"authToken"`
 	AuthTime            time.Time   `json:"authTime"`
 	Babies              []baby.Baby `json:"babies"`
+	RefreshToken        string      `json:"refreshToken"`
 	LastSeenMessageTime time.Time   `json:"lastSeenMessageTime"`
 }
 
