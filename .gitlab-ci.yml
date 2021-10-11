@@ -41,15 +41,16 @@ build app image:
   stage: app image
   script:
   - export BASE_IMAGE_TAG=$CI_COMMIT_REF_SLUG
-  - docker buildx imagetools inspect $BASE_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG > /dev/null || export BASE_IMAGE_TAG=latest
-  - "echo \"Using base image: $BASE_IMAGE_WITHOUT_TAG:$BASE_IMAGE_TAG\""
+  - docker buildx imagetools inspect $BASE_IMAGE_WITHOUT_TAG:$BASE_IMAGE_TAG > /dev/null || export BASE_IMAGE_TAG=latest
+  - export BASE_IMAGE=$BASE_IMAGE_WITHOUT_TAG:$BASE_IMAGE_TAG
+  - "echo \"Using base image: $BASE_IMAGE\""
   - |
     if [ "$CI_COMMIT_REF_NAME" == "master" ] || [ "$CI_COMMIT_REF_NAME" == "dev" ] || [[ "$CI_COMMIT_REF_NAME" =~ v[0-9].* ]]; then
       PLATFORM="linux/arm/v7,linux/arm64/v8,linux/amd64"
     else
       PLATFORM="linux/amd64"
     fi
-  - docker buildx build --no-cache --pull --push --platform $PLATFORM -t $APP_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG --build-arg CI_COMMIT_SHORT_SHA --build-arg BASE_IMAGE_TAG .
+  - docker buildx build --no-cache --pull --push --platform $PLATFORM -t $APP_IMAGE_WITHOUT_TAG:$CI_COMMIT_REF_SLUG --build-arg CI_COMMIT_SHORT_SHA --build-arg BASE_IMAGE .
 
 # Tag base image on master as latest
 release base image:
