@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
+	"gitlab.com/adam.stanek/nanit/pkg/message"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
 	"gitlab.com/adam.stanek/nanit/pkg/utils"
 )
@@ -25,6 +28,10 @@ type authResponsePayload struct {
 
 type babiesResponsePayload struct {
 	Babies []baby.Baby `json:"babies"`
+}
+
+type messagesResponsePayload struct {
+	Messages []message.Message `json:"messages"`
 }
 
 // ------------------------------------------
@@ -198,6 +205,20 @@ func (c *NanitClient) FetchBabies() []baby.Baby {
 	return data.Babies
 }
 
+// FetchMessages - fetches message list
+func (c *NanitClient) FetchMessages(babyUID string, limit int) []message.Message {
+	req, reqErr := http.NewRequest("GET", fmt.Sprintf("https://api.nanit.com/babies/%s/messages?limit=%d", babyUID, limit), nil)
+
+	if reqErr != nil {
+		log.Fatal().Err(reqErr).Msg("Unable to create request")
+	}
+
+	data := new(messagesResponsePayload)
+	c.FetchAuthorized(req, data)
+
+	return data.Messages
+}
+
 // EnsureBabies - fetches baby list if not fetched already
 func (c *NanitClient) EnsureBabies() []baby.Baby {
 	if len(c.SessionStore.Session.Babies) == 0 {
@@ -205,4 +226,47 @@ func (c *NanitClient) EnsureBabies() []baby.Baby {
 	}
 
 	return c.SessionStore.Session.Babies
+}
+
+// FetchNewMessages - fetches 10 newest messages, ignores any messages which were already fetched or which are older than 5 minutes
+func (c *NanitClient) FetchNewMessages(babyUID string, defaultMessageTimeout time.Duration) []message.Message {
+	fetchedMessages := c.FetchMessages(babyUID, 10)
+	newMessages := make([]message.Message, 0)
+
+	// return empty [] if there are no fetchedMessages
+	if len(fetchedMessages) == 0 {
+		log.Debug().Msg("No messages fetched")
+		return newMessages
+	}
+
+	// sort fetechedMessages starting with most recent
+	sort.Slice(fetchedMessages, func(i, j int) bool {
+		return fetchedMessages[i].Time.Time().After(fetchedMessages[j].Time.Time())
+	})
+
+	lastSeenMessageTime := c.SessionStore.Session.LastSeenMessageTime
+	messageTimeoutTime := lastSeenMessageTime
+	log.Debug().Msgf("Last seen message time was %s", lastSeenMessageTime)
+
+	// Don't know when last message was, set messageTimeout to default
+	if lastSeenMessageTime.IsZero() {
+		messageTimeoutTime = time.Now().UTC().Add(-defaultMessageTimeout)
+	}
+
+	// lastSeenMessageTime is older than most recent fetchedMessage, or is unset
+	if lastSeenMessageTime.Before(fetchedMessages[0].Time.Time()) {
+		lastSeenMessageTime = fetchedMessages[0].Time.Time()
+		c.SessionStore.Session.LastSeenMessageTime = lastSeenMessageTime
+		c.SessionStore.Save()
+	}
+
+	// Only keep messages that are more recent than messageTimeoutTime
+	filteredMessages := message.FilterMessages(fetchedMessages, func(message message.Message) bool {
+		return message.Time.Time().After(messageTimeoutTime)
+	})
+
+	log.Debug().Msgf("Found %d new messages", len(filteredMessages))
+	log.Debug().Msgf("%+v\n", filteredMessages)
+
+	return filteredMessages
 }

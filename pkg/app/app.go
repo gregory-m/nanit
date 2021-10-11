@@ -3,9 +3,11 @@ package app
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"gitlab.com/adam.stanek/nanit/pkg/baby"
 	"gitlab.com/adam.stanek/nanit/pkg/client"
+	"gitlab.com/adam.stanek/nanit/pkg/message"
 	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
 	"gitlab.com/adam.stanek/nanit/pkg/rtmpserver"
 	"gitlab.com/adam.stanek/nanit/pkg/session"
@@ -89,12 +91,35 @@ func (app *App) handleBaby(baby baby.Baby, ctx utils.GracefulContext) {
 			app.runWebsocket(baby.UID, conn, childCtx)
 		})
 
+		if app.Opts.EventPolling.Enabled {
+			go app.pollMessages(baby.UID, app.BabyStateManager)
+		}
+
 		ctx.RunAsChild(func(childCtx utils.GracefulContext) {
 			ws.RunWithinContext(childCtx)
 		})
 	}
 
 	<-ctx.Done()
+}
+
+func (app *App) pollMessages(babyUID string, babyStateManager *baby.StateManager) {
+	newMessages := app.RestClient.FetchNewMessages(babyUID, app.Opts.EventPolling.MessageTimeout)
+
+	for _, msg := range newMessages {
+		switch msg.Type {
+		case message.SoundEventMessageType:
+			go babyStateManager.NotifySoundSubscribers(babyUID, time.Time(msg.Time))
+			break
+		case message.MotionEventMessageType:
+			go babyStateManager.NotifyMotionSubscribers(babyUID, time.Time(msg.Time))
+			break
+		}
+	}
+
+	// wait for the specified interval
+	time.Sleep(app.Opts.EventPolling.PollingInterval)
+	app.pollMessages(babyUID, babyStateManager)
 }
 
 func (app *App) runWebsocket(babyUID string, conn *client.WebsocketConnection, childCtx utils.GracefulContext) {

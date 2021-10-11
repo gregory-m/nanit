@@ -18,10 +18,11 @@ services:
     ports:
     - 1935:1935
     # Configuration (see .env.sample file for all the options)
+    # Notice: Mind the quotes, whole pairs are quoted instead of just values. If your password contains $ character, replace it with double $$ to avoid interpolation.
     environment:
-    - NANIT_EMAIL=your@email.tld
-    - NANIT_PASSWORD=XXXXXXXXXXXXX
-    - NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935
+    - "NANIT_EMAIL=your@email.tld"
+    - "NANIT_PASSWORD=XXXXXXXXXXXXX"
+    - "NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935"
 ```
 
 ## Control the app container
@@ -40,8 +41,8 @@ docker-compose stop
 
 # Upgrade the app (ie. after you have changed the version tag or to pull fresh dev image)
 docker-compose pull  # pulls fresh image
-docker-compose down  # removes previously create container
-docker-compose up -d # creates new container with fresh image
+docker-compose down  # removes previously created container
+docker-compose up -d # creates new container with fresh image (do this after every change in the docker-compose file)
 
 # Uninstall the app
 docker-compose down

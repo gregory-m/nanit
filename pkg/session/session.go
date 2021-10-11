@@ -12,15 +12,16 @@ import (
 
 // Revision - marks the version of the structure of a session file. Only files with equal revision will be loaded
 // Note: you should increment this whenever you change the Session structure
-const Revision = 2
+const Revision = 3
 
 // Session - application session data container
 type Session struct {
-	Revision     int         `json:"revision"`
-	AuthToken    string      `json:"authToken"`
-	AuthTime     time.Time   `json:"authTime"`
-	Babies       []baby.Baby `json:"babies"`
-	RefreshToken string      `json:"refreshToken"`
+	Revision            int         `json:"revision"`
+	AuthToken           string      `json:"authToken"`
+	AuthTime            time.Time   `json:"authTime"`
+	Babies              []baby.Baby `json:"babies"`
+	RefreshToken        string      `json:"refreshToken"`
+	LastSeenMessageTime time.Time   `json:"lastSeenMessageTime"`
 }
 
 // Store - application session store context

@@ -1904,20 +1904,6 @@ func (*Control_SensorDataTransfer) Descriptor() ([]byte, []int) {
 	return file_pkg_client_websocket_proto_rawDescGZIP(), []int{2, 0}
 }
 
-func (x *Control_SensorDataTransfer) GetSound() bool {
-	if x != nil && x.Sound != nil {
-		return *x.Sound
-	}
-	return false
-}
-
-func (x *Control_SensorDataTransfer) GetMotion() bool {
-	if x != nil && x.Motion != nil {
-		return *x.Motion
-	}
-	return false
-}
-
 func (x *Control_SensorDataTransfer) GetTemperature() bool {
 	if x != nil && x.Temperature != nil {
 		return *x.Temperature
