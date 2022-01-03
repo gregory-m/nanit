@@ -6,7 +6,8 @@ stages:
 # Variables for all the jobs
 variables:
   APP_IMAGE_WITHOUT_TAG: $CI_REGISTRY_IMAGE
-  BASE_IMAGE_WITHOUT_TAG: $CI_REGISTRY_IMAGE/base
+  # Note: we are not using `$CI_REGISTRY_IMAGE/base` for easier forking of the repository
+  BASE_IMAGE_WITHOUT_TAG: registry.gitlab.com/adam.stanek/nanit/base
   DOCKER_HOST: tcp://docker:2375/
   DOCKER_DRIVER: overlay2
   # See https://github.com/docker-library/docker/pull/166
