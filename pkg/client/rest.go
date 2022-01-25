@@ -58,16 +58,16 @@ func (c *NanitClient) Authorize() {
 	}
 
 	if len(c.SessionStore.Session.RefreshToken) > 0 {
-		err := c.RenewSession(); // We have a refresh token, so we'll use that to extend our session
+		err := c.RenewSession() // We have a refresh token, so we'll use that to extend our session
 		if err == nil {
 			return
 		}
-		if (!errors.Is(err, ErrExpiredRefreshToken)) {
+		if !errors.Is(err, ErrExpiredRefreshToken) {
 			log.Fatal().Err(err).Msg("Unknown error occurred while trying to refresh the session")
 		}
 	}
-	
-	c.Login(); // We don't have a refresh token, e.g. initial login so we need to supply username/password
+
+	c.Login() // We don't have a refresh token, e.g. initial login so we need to supply username/password
 }
 
 // Renews an existing session using a valid refresh token
@@ -123,7 +123,11 @@ func (c *NanitClient) Login() {
 	}
 
 	//nanit-api-version: 1
-	req, _ := http.NewRequest("https://api.nanit.com/login", "application/json", bytes.NewBuffer(requestBody))
+	req, reqErr := http.NewRequest("POST", "https://api.nanit.com/login", bytes.NewBuffer(requestBody))
+	if reqErr != nil {
+		log.Fatal().Err(reqErr).Msg("Unable to create request")
+	}
+	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("nanit-api-version", "1") // required if you have MFA enabled or it'll reject the request
 	r, clientErr := myClient.Do(req)
 	if clientErr != nil {
