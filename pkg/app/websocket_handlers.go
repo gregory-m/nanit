@@ -48,7 +48,12 @@ func requestLocalStreaming(babyUID string, targetURL string, streamingStatus cli
 		_, err := awaitResponse(30 * time.Second)
 
 		if err != nil {
-			if err.Error() != "Request timeout" {
+			if err.Error() == "Forbidden: Number of Mobile App connections above limit, declining connection" {
+				log.Warn().Err(err).Msg("Too many app connections, waiting for local connection to become available...")
+				stateManager.Update(babyUID, *baby.NewState().SetStreamRequestState(baby.StreamRequestState_RequestFailed))
+                                time.Sleep(300 * time.Second)
+				continue
+			} else if err.Error() != "Request timeout" {
 				if stateManager.GetBabyState(babyUID).GetStreamState() == baby.StreamState_Alive {
 					log.Info().Err(err).Msg("Failed to request local streaming, but stream seems to be alive from previous run")
 				} else if stateManager.GetBabyState(babyUID).GetStreamState() == baby.StreamState_Unhealthy {
