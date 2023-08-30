@@ -8,7 +8,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
+
+	"github.com/gregory-m/nanit/pkg/utils"
 )
 
 func TestRunWithPerseverance(t *testing.T) {

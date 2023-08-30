@@ -4,9 +4,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"gitlab.com/adam.stanek/nanit/pkg/baby"
-	"gitlab.com/adam.stanek/nanit/pkg/client"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
+
+	"github.com/gregory-m/nanit/pkg/baby"
+	"github.com/gregory-m/nanit/pkg/client"
+	"github.com/gregory-m/nanit/pkg/utils"
 )
 
 func processSensorData(babyUID string, sensorData []*client.SensorData, stateManager *baby.StateManager) {

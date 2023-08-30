@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"gitlab.com/adam.stanek/nanit/pkg/app"
-	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
+
+	"github.com/gregory-m/nanit/pkg/app"
+	"github.com/gregory-m/nanit/pkg/mqtt"
+	"github.com/gregory-m/nanit/pkg/utils"
 )
 
 func main() {

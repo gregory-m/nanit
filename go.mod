@@ -1,4 +1,4 @@
-module gitlab.com/adam.stanek/nanit
+module github.com/gregory-m/nanit
 
 go 1.14
 

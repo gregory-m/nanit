@@ -1,8 +1,9 @@
 package app
 
 import (
-	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
 	"time"
+
+	"github.com/gregory-m/nanit/pkg/mqtt"
 )
 
 // Opts - application run options

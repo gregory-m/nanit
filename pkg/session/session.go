@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"gitlab.com/adam.stanek/nanit/pkg/baby"
+
+	"github.com/gregory-m/nanit/pkg/baby"
 )
 
 // Revision - marks the version of the structure of a session file. Only files with equal revision will be loaded

@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gitlab.com/adam.stanek/nanit/pkg/baby"
+
+	"github.com/gregory-m/nanit/pkg/baby"
 )
 
 func TestStateAsMap(t *testing.T) {

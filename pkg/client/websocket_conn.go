@@ -10,8 +10,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/sacOO7/gowebsocket"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/gregory-m/nanit/pkg/utils"
 )
 
 // WebsocketMessageHandler - message handler

@@ -8,10 +8,11 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/sacOO7/gowebsocket"
-	"gitlab.com/adam.stanek/nanit/pkg/baby"
-	"gitlab.com/adam.stanek/nanit/pkg/session"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/gregory-m/nanit/pkg/baby"
+	"github.com/gregory-m/nanit/pkg/session"
+	"github.com/gregory-m/nanit/pkg/utils"
 )
 
 type readyState struct {

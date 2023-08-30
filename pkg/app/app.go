@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/adam.stanek/nanit/pkg/baby"
-	"gitlab.com/adam.stanek/nanit/pkg/client"
-	"gitlab.com/adam.stanek/nanit/pkg/message"
-	"gitlab.com/adam.stanek/nanit/pkg/mqtt"
-	"gitlab.com/adam.stanek/nanit/pkg/rtmpserver"
-	"gitlab.com/adam.stanek/nanit/pkg/session"
-	"gitlab.com/adam.stanek/nanit/pkg/utils"
+	"github.com/gregory-m/nanit/pkg/baby"
+	"github.com/gregory-m/nanit/pkg/client"
+	"github.com/gregory-m/nanit/pkg/message"
+	"github.com/gregory-m/nanit/pkg/mqtt"
+	"github.com/gregory-m/nanit/pkg/rtmpserver"
+	"github.com/gregory-m/nanit/pkg/session"
+	"github.com/gregory-m/nanit/pkg/utils"
 )
 
 // App - application container

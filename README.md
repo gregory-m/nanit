@@ -2,6 +2,8 @@
 
 This is sleepless night induced pet project to restream Nanit Baby Monitor live stream for local viewing.
 
+This is fork of long time not updated https://gitlab.com/adam.stanek/nanit.
+
 ## Features
 
 - Restreaming of live feed to local RTMP server
@@ -56,8 +58,5 @@ For some insights see [Developer notes](docs/developer-notes.md).
 
 I made this program solely for learning purposes. Please use it at your own risk and always follow any terms and conditions which might be applied when communicating to Nanit servers.
 
-This program is free software. It comes without any warranty, to
-the extent permitted by applicable law. You can redistribute it
-and/or modify it under the terms of the Do What The Fuck You Want
-To Public License, Version 2, as published by Sam Hocevar. See
-http://sam.zoy.org/wtfpl/COPYING for more details.
+Original code used [WTFPL 2 license](http://sam.zoy.org/wtfpl/COPYING), this fork
+available under MIT license.

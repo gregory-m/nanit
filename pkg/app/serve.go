@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"gitlab.com/adam.stanek/nanit/pkg/baby"
+
+	"github.com/gregory-m/nanit/pkg/baby"
 )
 
 func serve(babies []baby.Baby, dataDir DataDirectories) {
