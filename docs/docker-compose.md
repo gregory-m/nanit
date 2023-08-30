@@ -18,10 +18,7 @@ services:
     ports:
     - 1935:1935
     # Configuration (see .env.sample file for all the options)
-    # Notice: Mind the quotes, whole pairs are quoted instead of just values. If your password contains $ character, replace it with double $$ to avoid interpolation.
     environment:
-    - "NANIT_EMAIL=your@email.tld"
-    - "NANIT_PASSWORD=XXXXXXXXXXXXX"
     - "NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935"
 ```
 

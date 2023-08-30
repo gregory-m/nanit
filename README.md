@@ -17,8 +17,6 @@ This is fork of long time not updated https://gitlab.com/adam.stanek/nanit.
 # Note: use your local IP, reachable from Cam (not 127.0.0.1)
 
 docker run --rm \
-  -e NANIT_EMAIL=your@email.tld \
-  -e NANIT_PASSWORD=XXXXXXXXXXXXX \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
   -p 1935:1935 \
   registry.gitlab.com/adam.stanek/nanit:v0-7

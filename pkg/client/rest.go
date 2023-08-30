@@ -39,8 +39,6 @@ type messagesResponsePayload struct {
 
 // NanitClient - client context
 type NanitClient struct {
-	Email        string
-	Password     string
 	RefreshToken string
 	SessionStore *session.Store
 }
@@ -60,15 +58,10 @@ func (c *NanitClient) Authorize() {
 
 	if len(c.SessionStore.Session.RefreshToken) > 0 {
 		err := c.RenewSession() // We have a refresh token, so we'll use that to extend our session
-		if err == nil {
-			return
-		}
-		if !errors.Is(err, ErrExpiredRefreshToken) {
-			log.Fatal().Err(err).Msg("Unknown error occurred while trying to refresh the session")
+		if err != nil {
+			log.Fatal().Err(err).Msg("Error occurred while trying to refresh the session")
 		}
 	}
-
-	c.Login() // We don't have a refresh token, e.g. initial login so we need to supply username/password
 }
 
 // Renews an existing session using a valid refresh token
@@ -89,7 +82,7 @@ func (c *NanitClient) RenewSession() error {
 
 	defer r.Body.Close()
 	if r.StatusCode == 404 {
-		log.Warn().Msg("Server responded with code 404. This typically means your refresh token has expired. Will try to login with username/password")
+		log.Warn().Msg("Server responded with code 404. This typically means your refresh token has expired.")
 		return ErrExpiredRefreshToken
 	} else if r.StatusCode > 299 || r.StatusCode < 200 {
 		log.Fatal().Int("code", r.StatusCode).Msg("Server responded with an error")
@@ -110,52 +103,6 @@ func (c *NanitClient) RenewSession() error {
 	c.SessionStore.Save()
 
 	return nil
-}
-
-func (c *NanitClient) Login() {
-	log.Info().Str("email", c.Email).Str("password", utils.AnonymizeToken(c.Password, 0)).Msg("Authorizing using user credentials")
-	requestBody, requestBodyErr := json.Marshal(map[string]string{
-		"email":    c.Email,
-		"password": c.Password,
-	})
-
-	if requestBodyErr != nil {
-		log.Fatal().Err(requestBodyErr).Msg("Unable to marshal auth body")
-	}
-
-	//nanit-api-version: 1
-	req, reqErr := http.NewRequest("POST", "https://api.nanit.com/login", bytes.NewBuffer(requestBody))
-	if reqErr != nil {
-		log.Fatal().Err(reqErr).Msg("Unable to create request")
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("nanit-api-version", "1") // required if you have MFA enabled or it'll reject the request
-	r, clientErr := myClient.Do(req)
-	if clientErr != nil {
-		log.Fatal().Err(clientErr).Msg("Unable to fetch auth token")
-	}
-
-	defer r.Body.Close()
-
-	if r.StatusCode == 401 {
-		log.Fatal().Msg("Server responded with code 401. Provided credentials has not been accepted by the server. Please check if your e-mail address and password is entered correctly and that 2FA is disabled on your account.")
-	} else if r.StatusCode != 201 {
-		log.Fatal().Int("code", r.StatusCode).Msg("Server responded with unexpected status code")
-	}
-
-	authResponse := new(authResponsePayload)
-
-	jsonErr := json.NewDecoder(r.Body).Decode(authResponse)
-	if jsonErr != nil {
-		log.Fatal().Err(jsonErr).Msg("Unable to decode response")
-	}
-
-	log.Info().Str("token", utils.AnonymizeToken(authResponse.AccessToken, 4)).Msg("Authorized")
-	log.Info().Str("refresh_token", utils.AnonymizeToken(authResponse.RefreshToken, 4)).Msg("Retreived")
-	c.SessionStore.Session.AuthToken = authResponse.AccessToken
-	c.SessionStore.Session.RefreshToken = authResponse.RefreshToken
-	c.SessionStore.Session.AuthTime = time.Now()
-	c.SessionStore.Save()
 }
 
 // FetchAuthorized - makes authorized http request
