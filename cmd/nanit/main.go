@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"os/signal"
 	"regexp"
@@ -13,15 +14,24 @@ import (
 	"github.com/gregory-m/nanit/pkg/utils"
 )
 
+var doLogin = flag.Bool("l", false, "Do login")
+
 func main() {
+	flag.Parse()
 	initLogger()
 	logAppVersion()
 	utils.LoadDotEnvFile()
 	setLogLevel()
 
+	var refresh_token = ""
+
+	if *doLogin {
+		refresh_token = Login("", "", "sms")
+	}
+
 	opts := app.Opts{
 		NanitCredentials: app.NanitCredentials{
-			RefreshToken: utils.EnvVarStr("NANIT_REFRESH_TOKEN", ""),
+			RefreshToken: utils.EnvVarStr("NANIT_REFRESH_TOKEN", refresh_token),
 		},
 		SessionFile:     utils.EnvVarStr("NANIT_SESSION_FILE", ""),
 		DataDirectories: ensureDataDirectories(),

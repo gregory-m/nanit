@@ -20,11 +20,33 @@ import (
 var myClient = &http.Client{Timeout: 10 * time.Second}
 var ErrExpiredRefreshToken = errors.New("Refresh token has expired. Relogin required.")
 
+type MFARequiredError struct {
+	MFAToken string
+}
+
+func (e *MFARequiredError) Error() string {
+	return "MFA authentication enabled for user account"
+}
+
 // ------------------------------------------
+
+type AuthRequestPayload struct {
+	Email    string `json:"email,omitempty"`
+	Password string `json:"password,omitempty"`
+	Channel  string `json:"channel,omitempty"`
+	MFAToken string `json:"mfa_token,omitempty"`
+	MFACode  string `json:"mfa_code,omitempty"`
+}
 
 type authResponsePayload struct {
 	AccessToken  string `json:"access_token,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"` // We can store this to renew a session, avoiding the need to re-auth with MFA
+}
+
+type authMFAEnabledResponsePayload struct {
+	MFAToken    string `json:"mfa_token,omitempty"`
+	PhoneSuffix string `json:"phone_suffix,omitempty"`
+	Channel     string `json:"channel,omitempty"`
 }
 
 type babiesResponsePayload struct {
@@ -67,6 +89,7 @@ func (c *NanitClient) Authorize() {
 // Renews an existing session using a valid refresh token
 // If the refresh token has also expired, we need to perform a full re-login
 func (c *NanitClient) RenewSession() error {
+	log.Debug().Str("refresh_token", utils.AnonymizeToken(c.SessionStore.Session.RefreshToken, 4)).Msg("Renewing Session")
 	requestBody, requestBodyErr := json.Marshal(map[string]string{
 		"refresh_token": c.SessionStore.Session.RefreshToken,
 	})
@@ -103,6 +126,64 @@ func (c *NanitClient) RenewSession() error {
 	c.SessionStore.Save()
 
 	return nil
+}
+
+// Login - performs login with MFA support
+func (c *NanitClient) Login(authReq *AuthRequestPayload) (accessToken string, refreshToken string, err error) {
+	log.Debug().
+		Str("email", authReq.Email).
+		Str("password", utils.AnonymizeToken(authReq.Password, 0)).
+		Str("channel", authReq.Channel).
+		Str("mfa_token", utils.AnonymizeToken(authReq.MFAToken, 4)).
+		Str("mfa_code", utils.AnonymizeToken(authReq.MFAToken, 1)).
+		Msg("Authorizing")
+
+	requestBody, err := json.Marshal(authReq)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to marshal auth body: %q", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.nanit.com/login", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return "", "", fmt.Errorf("unable to create request: %q", err)
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("nanit-api-version", "2")
+	r, err := myClient.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("unable to fetch auth token: %q", err)
+	}
+
+	defer r.Body.Close()
+
+	if r.StatusCode == 401 {
+		return "", "", fmt.Errorf("server responded with code 401, provided credentials has not been accepted by the server")
+	} else if r.StatusCode == 482 {
+		mfaResponse := new(authMFAEnabledResponsePayload)
+
+		err = json.NewDecoder(r.Body).Decode(mfaResponse)
+		if err != nil {
+			return "", "", fmt.Errorf("unable to decode MFA response: %q", err)
+		}
+
+		log.Debug().Str("mfa_token", utils.AnonymizeToken(mfaResponse.MFAToken, 4)).Msg("MFA Required")
+		return "", "", &MFARequiredError{MFAToken: mfaResponse.MFAToken}
+	} else if r.StatusCode != 201 {
+		return "", "", fmt.Errorf("server responded with unexpected status code: %d", r.StatusCode)
+	}
+
+	authResponse := new(authResponsePayload)
+
+	jsonErr := json.NewDecoder(r.Body).Decode(authResponse)
+	if jsonErr != nil {
+		return "", "", fmt.Errorf("unable to decode auth response: %q", err)
+	}
+
+	log.Debug().Str("access_token", utils.AnonymizeToken(authResponse.AccessToken, 4)).
+		Str("refresh_token", utils.AnonymizeToken(authResponse.RefreshToken, 4)).
+		Msg("Authorized")
+
+	return authResponse.AccessToken, authResponse.RefreshToken, nil
 }
 
 // FetchAuthorized - makes authorized http request
