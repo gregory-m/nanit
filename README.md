@@ -14,12 +14,23 @@ This is fork of long time not updated https://gitlab.com/adam.stanek/nanit.
 ## TL;DR
 
 ```bash
-# Note: use your local IP, reachable from Cam (not 127.0.0.1)
 
-docker run --rm \
+
+# Note: use your local IP, reachable from Cam (not 127.0.0.1)
+# Login to your nanit account and check everything is working
+docker run --rm -it \
+  -v ${HOME}/.nanit-data:/app/data \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
   -p 1935:1935 \
-  registry.gitlab.com/adam.stanek/nanit:v0-7
+  ghcr.io/gregory-m/nanit /app/bin/nanit -l
+
+# Note: use your local IP, reachable from Cam (not 127.0.0.1)
+# Run it normal mode
+docker run --rm \
+  -v ${HOME}/.nanit-data:/app/data \
+  -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
+  -p 1935:1935 \
+  ghcr.io/gregory-m/nanit
 ```
 
 Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC. You will find your baby UID in the log of running application.
