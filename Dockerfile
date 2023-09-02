@@ -1,16 +1,11 @@
-ARG BASE_IMAGE=registry.gitlab.com/adam.stanek/nanit/base:latest
-
-FROM golang:1.15.5-buster AS build
-ADD cmd /app/cmd
-ADD pkg /app/pkg
-ADD go.mod /app/
-ADD go.sum /app/
+FROM golang:1.21 AS build
+ADD . /app/
 WORKDIR /app
-ARG CI_COMMIT_SHORT_SHA
-RUN go build -ldflags "-X main.GitCommit=$CI_COMMIT_SHORT_SHA" -o ./bin/nanit ./cmd/nanit/*.go
+RUN CGO_ENABLED=0 go build -ldflags "-X main.GitCommit=$(git rev-parse --short HEAD)" -o ./bin/nanit ./cmd/nanit/*.go
 
-FROM $BASE_IMAGE
+FROM alpine
 RUN mkdir -p /app/data
 COPY --from=build /app/bin/nanit /app/bin/nanit
 WORKDIR /app
+VOLUME [ "/app/data" ]
 CMD ["/app/bin/nanit"]
