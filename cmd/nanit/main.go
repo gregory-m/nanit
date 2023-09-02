@@ -33,7 +33,7 @@ func main() {
 		NanitCredentials: app.NanitCredentials{
 			RefreshToken: utils.EnvVarStr("NANIT_REFRESH_TOKEN", refresh_token),
 		},
-		SessionFile:     utils.EnvVarStr("NANIT_SESSION_FILE", ""),
+		SessionFile:     utils.EnvVarStr("NANIT_SESSION_FILE", "data/session.json"),
 		DataDirectories: ensureDataDirectories(),
 		HTTPEnabled:     false,
 		EventPolling: app.EventPollingOpts{
