@@ -37,7 +37,7 @@ docker run --rm \
   ghcr.io/gregory-m/nanit
 ```
 
-Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC (or, if you provided `NANIT_RTMP_PATH` and `NANIT_RTMP_KEY`, `rtmp://127.0.0.1:1935<path>/<key>`). You will find your baby UID in the log of running application.
+Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC. You will find your baby UID in the log of the running application. (If you provided `NANIT_RTMP_PATH` and `NANIT_RTMP_KEY`, the URL will be `rtmp://127.0.0.1:1935<path>/<key>`).
 ### Setup guides
 
 - [Home assistant](./docs/home-assistant.md)
