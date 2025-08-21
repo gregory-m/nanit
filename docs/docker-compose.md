@@ -20,6 +20,8 @@ services:
     # Configuration (see .env.sample file for all the options)
     environment:
     - "NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935"
+    - "NANIT_RTMP_PATH=/local"
+    - "NANIT_RTMP_KEY=abc123"
 ```
 
 ## Control the app container

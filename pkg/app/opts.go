@@ -38,6 +38,12 @@ type RTMPOpts struct {
 
 	// IP:Port under which can Cam reach the RTMP server
 	PublicAddr string
+
+	// Path where the cam can reach the RTMP server
+	Path string
+
+	// Key for this stream
+	Key string
 }
 
 type EventPollingOpts struct {

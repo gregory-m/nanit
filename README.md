@@ -21,6 +21,8 @@ This is fork of long time not updated https://gitlab.com/adam.stanek/nanit.
 docker run --rm -it \
   -v ${HOME}/.nanit-data:/app/data \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
+  -e NANIT_RTMP_PATH=/local \
+  -e NANIT_RTMP_KEY=abc123 \
   -p 1935:1935 \
   ghcr.io/gregory-m/nanit /app/bin/nanit -l
 
@@ -29,11 +31,13 @@ docker run --rm -it \
 docker run --rm \
   -v ${HOME}/.nanit-data:/app/data \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
+  -e NANIT_RTMP_PATH=/local \
+  -e NANIT_RTMP_KEY=abc123 \
   -p 1935:1935 \
   ghcr.io/gregory-m/nanit
 ```
 
-Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC. You will find your baby UID in the log of running application.
+Open `rtmp://127.0.0.1:1935/local/[your_baby_uid]` in VLC (or, if you provided `NANIT_RTMP_PATH` and `NANIT_RTMP_KEY`, `rtmp://127.0.0.1:1935<path>/<key>`). You will find your baby UID in the log of running application.
 ### Setup guides
 
 - [Home assistant](./docs/home-assistant.md)
