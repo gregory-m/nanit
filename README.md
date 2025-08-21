@@ -17,7 +17,7 @@ This is fork of long time not updated https://gitlab.com/adam.stanek/nanit.
 
 
 # Note: use your local IP, reachable from Cam (not 127.0.0.1)
-# Login to your nanit account and check everything is working
+# Login to your Nanit account and check everything is working
 docker run --rm -it \
   -v ${HOME}/.nanit-data:/app/data \
   -e NANIT_RTMP_ADDR=xxx.xxx.xxx.xxx:1935 \
